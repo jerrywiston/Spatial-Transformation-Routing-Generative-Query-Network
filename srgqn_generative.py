@@ -37,18 +37,13 @@ class SRGQN(nn.Module):
         wrd_cell = self.view2wrd(view_cell, v, drop=False)
         return wrd_cell
     
-    def step_scene_fusion(self, wrd_cell, n_obs, th=0, mode="mean"): # mode=sum/mean
+    def step_scene_fusion(self, wrd_cell, n_obs, mode="sum"): # mode=sum/mean
         if mode == "sum":
             scene_cell = torch.sum(wrd_cell.view(-1, n_obs, self.tsize, self.n_wrd_cells), 1, keepdim=False)
             scene_cell = torch.sigmoid(scene_cell)
-        elif mode == "mean":
-            scene_cell = 4*torch.mean(wrd_cell.view(-1, n_obs, self.tsize, self.n_wrd_cells), 1, keepdim=False)
-            scene_cell = torch.sigmoid(scene_cell)    
         else:
             scene_cell = torch.mean(wrd_cell.view(-1, n_obs, self.tsize, self.n_wrd_cells), 1, keepdim=False)
-        # Apply Threshold
-        if th is not None:
-            scene_cell = torch.relu(scene_cell - th) + th
+            scene_cell = torch.relu(scene_cell)
         return scene_cell
     
     def step_query_view(self, scene_cell, xq, vq):
