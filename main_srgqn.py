@@ -10,8 +10,8 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
  
-import srgqn_generative as srgqn
-from gqn_dataset import GqnDatasets
+from srgqn import SRGQN
+from dataset import GqnDatasets
 
 ############ Util Functions ############
 def draw_result(net, dataset, obs_size=4, gen_size=6):
@@ -115,7 +115,7 @@ if not os.path.exists(save_path):
 
 ############ Networks ############
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-net = srgqn.SRGQN(n_wrd_cells=args.w, n_ren_cells=args.r, tsize=args.c, ch=64, vsize=7).to(device)
+net = SRGQN(n_wrd_cells=args.w, n_ren_cells=args.r, tsize=args.c, ch=64, vsize=7).to(device)
 params = list(net.parameters())
 opt = optim.Adam(params, lr=5e-5, betas=(0.5, 0.999))
 
