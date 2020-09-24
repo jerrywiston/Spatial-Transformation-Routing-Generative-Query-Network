@@ -42,8 +42,7 @@ class EncoderRes(nn.Module):
         h_pool1 = self.pool1(h_res1)
         h_res2 = self.res2(h_pool1)
         h_pool2 = self.pool2(h_res2)
-        h_res3 = self.res3(h_pool2)
-        out = torch.tanh(h_res3)
+        out = self.res3(h_pool2)
         return out
 
 class DecodeRes(nn.Module):
@@ -89,7 +88,6 @@ class Encoder(nn.Module):
         
     def forward(self, x):
         out = self.net(x)
-        out = torch.tanh(out)
         return out
 
 class WorldTransform(nn.Module):

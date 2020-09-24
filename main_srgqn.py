@@ -13,7 +13,7 @@ import srgqn_generative as srgqn
 from gqn_dataset import GqnDatasets
 
 ############ Util Functions ############
-def draw_result(net, dataset, obs_size=4, gen_size=6):
+def draw_result(net, dataset, obs_size=3, gen_size=5):
     data_loader = DataLoader(dataset, batch_size=1, shuffle=True)
     for it, batch in enumerate(data_loader):
         image = batch[0].squeeze(0)
@@ -204,9 +204,9 @@ for epoch in range(total_epoch):
 
     # ------------ Evaluation Record ------------
     print("Evaluate Training Data ...")
-    lh_train, kl_train, _, _ = eval(net, train_dataset, obs_size=4)
+    lh_train, kl_train, _, _ = eval(net, train_dataset, obs_size=3)
     print("Evaluate Testing Data ...")
-    lh_test, kl_test, _, _ = eval(net, test_dataset, obs_size=4)
+    lh_test, kl_test, _, _ = eval(net, test_dataset, obs_size=3)
     eval_record["mse_train"].append(lh_train)
     eval_record["kl_train"].append(kl_train)
     eval_record["mse_test"].append(lh_test)
