@@ -26,11 +26,11 @@ class SRGQN(nn.Module):
         self.vsize = vsize
         self.ch = ch
 
-        self.encoder = models.Encoder(ch, tsize).to(device)
+        self.encoder = models.EncoderRes(ch, tsize).to(device)
         self.view2wrd = models.WorldTransform(16*16, n_wrd_cells, vsize=vsize, ch=64).to(device)
         self.wrd2ren = models.WorldTransform(n_wrd_cells, n_ren_cells, vsize=vsize, ch=64).to(device)
         self.renderer = models.Renderer(n_ren_cells, (16,16), tsize, n_steps=6).to(device)
-        self.generator = generator.GeneratorNetwork(x_dim=3, r_dim=tsize).to(device)
+        self.generator = generator.GeneratorNetwork(x_dim=3, r_dim=tsize, L=12).to(device)
 
     def step_observation_encode(self, x, v):
         view_cell = self.encoder(x).reshape(-1, self.tsize, 16*16)

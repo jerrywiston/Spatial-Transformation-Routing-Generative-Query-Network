@@ -80,6 +80,7 @@ parser = argparse.ArgumentParser(description='Traning parameters of SR-GQN.')
 parser.add_argument('--data_path', nargs='?', type=str, default="../GQN-Datasets-pt/rooms_ring_camera", help='Dataset name.')
 parser.add_argument('--frac_train', nargs='?', type=float, default=0.01, help='Fraction of data used for training.')
 parser.add_argument('--frac_test', nargs='?', type=float, default=0.01, help='Fraction of data used for testing.')
+parser.add_argument('--exp_name', nargs='?', type=int, default="rrc" ,help='Experiment name (for the created result folder).')
 parser.add_argument('--w', nargs='?', type=int, default=2000 ,help='Number of world cells.')
 parser.add_argument('--r', nargs='?', type=int, default=500 ,help='Number of render cells.')
 parser.add_argument('--c', nargs='?', type=int, default=128 ,help='Number of concepts.')
@@ -103,7 +104,7 @@ now = datetime.datetime.now()
 #tinfo = "%d-%d-%d_%d-%d"%(now.year, now.month, now.day, now.hour, now.minute) #second / microsecond
 tinfo = "%d-%d-%d"%(now.year, now.month, now.day)
 exp_path = "experiments/"
-model_name = "rrc_w%d_r%d_c%d"%(args.w, args.r, args.c)
+model_name = args.exp_name + "_w%d_r%d_c%d"%(args.w, args.r, args.c)
 model_path = exp_path + model_name + "_" + tinfo + "/"
 
 img_path = model_path + "img/"
