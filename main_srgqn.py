@@ -3,14 +3,15 @@ import cv2
 import os
 import json
 import datetime
+import argparse
 
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
  
-import srgqn_generative as srgqn
-from gqn_dataset import GqnDatasets
+from srgqn import SRGQN
+from dataset import GqnDatasets
 
 ############ Util Functions ############
 def draw_result(net, dataset, obs_size=3, gen_size=5):
@@ -26,21 +27,21 @@ def draw_result(net, dataset, obs_size=3, gen_size=5):
         # Draw Observation
         canvas = np.zeros((64*gen_size,64*(obs_size+2),3), dtype=np.uint8)
         x_obs_draw = (image[:gen_size,:obs_size].detach()*255).permute(0,3,1,4,2).cpu().numpy().astype(np.uint8)
-        x_obs_draw = cv2.cvtColor(x_obs_draw.reshape(64*gen_size,64*4,3), cv2.COLOR_BGR2RGB)
-        canvas[:64*gen_size,:64*4,:] = x_obs_draw
+        x_obs_draw = cv2.cvtColor(x_obs_draw.reshape(64*gen_size,64*obs_size,3), cv2.COLOR_BGR2RGB)
+        canvas[:64*gen_size,:64*obs_size,:] = x_obs_draw
         # Draw Query GT
         x_gt_draw = (image[:gen_size,obs_size+1].detach()*255).permute(0,2,3,1).cpu().numpy().astype(np.uint8)
         x_gt_draw = cv2.cvtColor(x_gt_draw.reshape(64*gen_size,64,3), cv2.COLOR_BGR2RGB)
-        canvas[:,64*4:64*5,:] = x_gt_draw
+        canvas[:,64*(obs_size):64*(obs_size+1),:] = x_gt_draw
         # Draw Query Gen
         x_query_draw = (x_query[:gen_size].detach()*255).permute(0,2,3,1).cpu().numpy().astype(np.uint8)
         x_query_draw = cv2.cvtColor(x_query_draw.reshape(64*gen_size,64,3), cv2.COLOR_BGR2RGB)
-        canvas[:,64*5:,:] = x_query_draw
+        canvas[:,64*(obs_size+1):,:] = x_query_draw
         # Draw Grid
         cv2.line(canvas, (0,0),(0,64*gen_size),(0,0,0), 2)
-        cv2.line(canvas, (64*6-1,0),(64*6-1,64*gen_size),(0,0,0), 2)
-        cv2.line(canvas, (64*4,0),(64*4,64*gen_size),(255,0,0), 2)
-        cv2.line(canvas, (64*5,0),(64*5,64*gen_size),(0,0,255), 2)
+        cv2.line(canvas, (64*(obs_size+2)-1,0),(64*(obs_size+2)-1,64*gen_size),(0,0,0), 2)
+        cv2.line(canvas, (64*obs_size,0),(64*obs_size,64*gen_size),(255,0,0), 2)
+        cv2.line(canvas, (64*(obs_size+1),0),(64*(obs_size+1),64*gen_size),(0,0,255), 2)
         for i in range(1,4):
             canvas[:,64*i:64*i+1,:] = 0
         for i in range(gen_size):
@@ -76,7 +77,7 @@ def eval(net, dataset, obs_size=4):
 
 ############ Parameter Parsing ############
 parser = argparse.ArgumentParser(description='Traning parameters of SR-GQN.')
-parser.add_argument('--data_path', nargs='?', type=str, default="rooms_ring_camera_pt", help='Dataset name.')
+parser.add_argument('--data_path', nargs='?', type=str, default="../GQN-Datasets-pt/rooms_ring_camera", help='Dataset name.')
 parser.add_argument('--frac_train', nargs='?', type=float, default=0.01, help='Fraction of data used for training.')
 parser.add_argument('--frac_test', nargs='?', type=float, default=0.01, help='Fraction of data used for testing.')
 parser.add_argument('--w', nargs='?', type=int, default=2000 ,help='Number of world cells.')
@@ -84,9 +85,14 @@ parser.add_argument('--r', nargs='?', type=int, default=500 ,help='Number of ren
 parser.add_argument('--c', nargs='?', type=int, default=128 ,help='Number of concepts.')
 args = parser.parse_args()
 
+print("Data path: %s"%(args.data_path))
+print("Data fraction: %f / %f"%(args.frac_train, args.frac_test))
+print("Number of world cells: %d"%(args.w))
+print("Number of render cells: %d"%(args.r))
+print("Number of concepts: %d"%(args.c))
+
 ############ Dataset ############
-#path = arg.data_path
-path = "../Spatial-Concept-Learner/GQN-Datasets/rooms_ring_camera_pt"
+path = args.data_path
 train_dataset = GqnDatasets(root_dir=path, train=True, fraction=args.frac_train)
 test_dataset = GqnDatasets(root_dir=path, train=False, fraction=args.frac_test)
 print("Train data: ", len(train_dataset))
@@ -97,7 +103,7 @@ now = datetime.datetime.now()
 #tinfo = "%d-%d-%d_%d-%d"%(now.year, now.month, now.day, now.hour, now.minute) #second / microsecond
 tinfo = "%d-%d-%d"%(now.year, now.month, now.day)
 exp_path = "experiments/"
-model_name = "rrc_w%d_r%d_c%d"%(arg.w, arg.r, arg.c)
+model_name = "rrc_w%d_r%d_c%d"%(args.w, args.r, args.c)
 model_path = exp_path + model_name + "_" + tinfo + "/"
 
 img_path = model_path + "img/"
@@ -109,18 +115,18 @@ if not os.path.exists(save_path):
 
 ############ Networks ############
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-net = srgqn.SRGQN(n_wrd_cells=n_world_cells, n_ren_cells=n_render_cells, tsize=n_concepts, ch=64, vsize=7).to(device)
+net = SRGQN(n_wrd_cells=args.w, n_ren_cells=args.r, tsize=args.c, ch=64, vsize=7).to(device)
 params = list(net.parameters())
 opt = optim.Adam(params, lr=5e-5, betas=(0.5, 0.999))
 
 ############ Training ############
 max_obs_size = 5
-total_epoch = 401
+total_epoch = 400
 train_record = {"loss_query":[], "lh_query":[], "kl_query":[]}
 eval_record = {"mse_train":[], "kl_train":[], "mse_test":[], "kl_test":[]}
 print("Start training ...")
 print("==============================")
-for epoch in range(total_epoch):
+for epoch in range(1,total_epoch+1):
     print("Start Epoch", str(datetime.datetime.now()))
     # ------------ Shuffle Datasets ------------
     train_loader = DataLoader(train_dataset, batch_size=1, shuffle=True)
