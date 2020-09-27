@@ -66,7 +66,7 @@ def eval(net, dataset, obs_size=4):
             x_query_sample = net.sample(x_obs, v_obs, v_query, n_obs=obs_size)
             x_query, kl_query = net(x_obs, v_obs, x_query_gt, v_query, n_obs=obs_size)
             kl_query = torch.mean(torch.sum(kl_query, dim=[1,2,3])).cpu().numpy()
-            mse_batch = nn.MSELoss()(x_query_sample, x_query_gt)
+            mse_batch = nn.MSELoss()(x_query_sample, x_query_gt).cpu().numpy()
             lh_query = mse_batch.mean()
             lh_query_var = mse_batch.var()
             lh_record.append(lh_query)
