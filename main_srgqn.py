@@ -75,7 +75,7 @@ def eval(net, dataset, obs_size=4):
     lh_mean = np.array(lh_record).mean()
     lh_mean_var = np.array(lh_query_var).mean()
     kl_mean = np.array(kl_record).mean()
-    print("\nMSE =", lh_mean,"+- " + lh_mean_var + ", KL =", kl_mean)
+    print("\nMSE =" + lh_mean + "+- " + lh_mean_var + ", KL =", kl_mean)
     return float(lh_mean), float(kl_mean), lh_record, kl_record
 
 ############ Parameter Parsing ############
