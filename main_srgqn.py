@@ -226,8 +226,8 @@ for epoch in range(1,total_epoch+1):
     if lh_test < best_mse:
         best_mse = lh_test
         print("Save model ...")
-        torch.save(net.state_dict(), save_path + "srgqn.pth")
-        #torch.save(net.state_dict(), save_path + "srgqn_ep" + str(epoch).zfill(4) + ".pth")
+        #torch.save(net.state_dict(), save_path + "srgqn.pth")
+        torch.save(net.state_dict(), save_path + "srgqn_ep" + str(epoch).zfill(4) + ".pth")
 
     print("==============================")
     
