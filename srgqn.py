@@ -26,7 +26,7 @@ class SRGQN(nn.Module):
         self.vsize = vsize
         self.ch = ch
 
-        self.encoder = models.EncoderRes(ch, tsize).to(device)
+        self.encoder = models.Encoder(ch, tsize).to(device)
         self.view2wrd = models.WorldTransform(16*16, n_wrd_cells, vsize=vsize, ch=64).to(device)
         self.wrd2ren = models.WorldTransform(n_wrd_cells, n_ren_cells, vsize=vsize, ch=64).to(device)
         self.renderer = models.Renderer(n_ren_cells, (16,16), tsize, n_steps=6).to(device)

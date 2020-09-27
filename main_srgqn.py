@@ -65,14 +65,17 @@ def eval(net, dataset, obs_size=4):
         with torch.no_grad():
             x_query_sample = net.sample(x_obs, v_obs, v_query, n_obs=obs_size)
             x_query, kl_query = net(x_obs, v_obs, x_query_gt, v_query, n_obs=obs_size)
-            lh_query = nn.MSELoss()(x_query_sample, x_query_gt).mean()
-            kl_query = torch.mean(torch.sum(kl_query, dim=[1,2,3]))
-            lh_record.append(lh_query.cpu().numpy())
-            kl_record.append(kl_query.cpu().numpy())
+            kl_query = torch.mean(torch.sum(kl_query, dim=[1,2,3])).cpu().numpy()
+            mse_batch = nn.MSELoss()(x_query_sample, x_query_gt)
+            lh_query = mse_batch.mean()
+            lh_query_var = mse_batch.var()
+            lh_record.append(lh_query)
+            kl_record.append(kl_query)
         print("\r[Eval %s/%s] MSE: %f| KL: %f"%(str(it).zfill(4), str(len(dataset)).zfill(4), lh_query, kl_query), end="")
     lh_mean = np.array(lh_record).mean()
+    lh_mean_var = np.array(lh_query_var).mean()
     kl_mean = np.array(kl_record).mean()
-    print("\nMSE =", lh_mean,", KL =", kl_mean)
+    print("\nMSE =", lh_mean,"+- " + lh_mean_var + ", KL =", kl_mean)
     return float(lh_mean), float(kl_mean), lh_record, kl_record
 
 ############ Parameter Parsing ############
@@ -125,6 +128,7 @@ max_obs_size = 5
 total_epoch = 400
 train_record = {"loss_query":[], "lh_query":[], "kl_query":[]}
 eval_record = {"mse_train":[], "kl_train":[], "mse_test":[], "kl_test":[]}
+best_mse = 999999
 print("Start training ...")
 print("==============================")
 for epoch in range(1,total_epoch+1):
@@ -182,10 +186,6 @@ for epoch in range(1,total_epoch+1):
             loss_query_list.append(loss_query)
             lh_query_list.append(lh_query)
             kl_query_list.append(kl_query)
-    
-    # ------------ Save Model (One Epoch) ------------
-    print("Save model ...")
-    torch.save(net.state_dict(), save_path + "srgqn_ep" + str(epoch).zfill(4) + ".pth")
 
     # ------------ Output Image ------------
     print("Generate image ...")
@@ -221,6 +221,13 @@ for epoch in range(1,total_epoch+1):
     print("Dump evaluation record ...")
     with open(model_path+'eval_record.json', 'w') as file:
         json.dump(eval_record, file)
+
+    # ------------ Save Model (One Epoch) ------------
+    if lh_test < best_mse:
+        best_mse = lh_test
+        print("Save model ...")
+        torch.save(net.state_dict(), save_path + "srgqn.pth")
+        #torch.save(net.state_dict(), save_path + "srgqn_ep" + str(epoch).zfill(4) + ".pth")
 
     print("==============================")
     
