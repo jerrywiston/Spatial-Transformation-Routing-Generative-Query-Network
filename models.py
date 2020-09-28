@@ -90,6 +90,41 @@ class Encoder(nn.Module):
         out = self.net(x)
         return out
 
+class EncoderPose(nn.Module):
+    def __init__(self, ch=64, tsize=128, im_size=16):
+        super(EncoderPose, self).__init__()
+        self.conv1 = Conv2d(3, ch, 3, stride=2)
+        self.conv2 = Conv2d(ch, ch, 3, stride=1)
+        self.bn2 = nn.BatchNorm2d(ch)
+        self.conv3 = Conv2d(ch, ch, 3, stride=2)
+        self.bn3 = nn.BatchNorm2d(ch)
+        self.conv4 = Conv2d(ch+9, ch*2, 3, stride=1)
+        self.bn4 = nn.BatchNorm2d(ch*2)
+        self.conv5 = Conv2d(ch*2, ch*2, 3, stride=1)
+        self.bn5 = nn.BatchNorm2d(ch*2)
+        self.conv6 = Conv2d(ch*2, tsize, 1, stride=1)
+
+        self.im_size = im_size
+        x = torch.linspace(-1, 1, im_size).to(device)
+        y = torch.linspace(-1, 1, im_size).to(device)
+        self.x_grid, self.y_grid = torch.meshgrid(x, y)
+        
+    def forward(self, x, v):
+        batch_size = x.shape[0]
+        v = v.view(v.size(0), -1, 1, 1)
+        v = v.repeat(1, 1, self.im_size, self.im_size)
+        x_grid = self.x_grid.reshape(1,1,self.x_grid.shape[0],self.x_grid.shape[1]).repeat(batch_size,1,1,1)
+        y_grid = self.y_grid.reshape(1,1,self.y_grid.shape[0],self.y_grid.shape[1]).repeat(batch_size,1,1,1)
+
+        out = F.relu(self.conv1(x), inplace=True)
+        out = F.relu(self.bn2(self.conv2(out)), inplace=True) + out
+        out = F.relu(self.bn3(self.conv3(out)), inplace=True)
+        out = torch.cat((out, v, x_grid, y_grid), dim=1)
+        out = F.relu(self.bn4(self.conv4(out)), inplace=True)
+        out = F.relu(self.bn5(self.conv5(out)), inplace=True) + out
+        out = self.conv6(out)
+        return out
+
 class WorldTransform(nn.Module):
     def __init__(self, n_src_cells, n_tgt_cells, vsize, ch=16):
         super(WorldTransform, self).__init__()

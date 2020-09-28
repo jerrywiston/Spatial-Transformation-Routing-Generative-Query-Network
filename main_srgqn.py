@@ -155,7 +155,7 @@ for epoch in range(1,total_epoch+1):
 
         # ------------ Get data (Fixed Observation) ------------
         '''
-        obs_size = 4
+        obs_size = 3
         x_obs = image[:,:obs_size].reshape(-1,3,64,64).to(device)
         v_obs = pose[:,:obs_size].reshape(-1,7).to(device)
         x_query_gt = image[:,obs_size+1].to(device)
@@ -223,11 +223,14 @@ for epoch in range(1,total_epoch+1):
         json.dump(eval_record, file)
 
     # ------------ Save Model (One Epoch) ------------
+    if epoch%20 == 0:
+        print("Save model ...")
+        torch.save(net.state_dict(), save_path + "srgqn_ep" + str(epoch).zfill(4) + ".pth")
+
     if lh_test < best_mse:
         best_mse = lh_test
-        print("Save model ...")
-        #torch.save(net.state_dict(), save_path + "srgqn.pth")
-        torch.save(net.state_dict(), save_path + "srgqn_ep" + str(epoch).zfill(4) + ".pth")
+        print("Save best model ...")
+        torch.save(net.state_dict(), save_path + "srgqn.pth")
 
     print("==============================")
     
