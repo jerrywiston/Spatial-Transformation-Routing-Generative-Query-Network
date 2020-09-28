@@ -18,7 +18,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Deterministic
 class SRGQN(nn.Module):
-    def __init__(self, n_wrd_cells=2048, n_ren_cells=512, tsize=128, ch=64, vsize=3):
+    def __init__(self, n_wrd_cells=2048, n_ren_cells=512, tsize=128, ch=64, vsize=7):
         super(SRGQN, self).__init__()
         self.n_wrd_cells = n_wrd_cells
         self.n_ren_cells = n_ren_cells
@@ -26,14 +26,14 @@ class SRGQN(nn.Module):
         self.vsize = vsize
         self.ch = ch
 
-        self.encoder = models.EncoderPose(ch, tsize).to(device)
+        self.encoder = models.Encoder(ch, tsize).to(device)
         self.view2wrd = models.WorldTransform(16*16, n_wrd_cells, vsize=vsize, ch=64).to(device)
         self.wrd2ren = models.WorldTransform(n_wrd_cells, n_ren_cells, vsize=vsize, ch=64).to(device)
         self.renderer = models.Renderer(n_ren_cells, (16,16), tsize, n_steps=6).to(device)
         self.generator = generator.GeneratorNetwork(x_dim=3, r_dim=tsize, L=12).to(device)
 
     def step_observation_encode(self, x, v):
-        view_cell = self.encoder(x, v).reshape(-1, self.tsize, 16*16)
+        view_cell = self.encoder(x).reshape(-1, self.tsize, 16*16)
         wrd_cell = self.view2wrd(view_cell, v, drop=False)
         return wrd_cell
     
@@ -52,13 +52,13 @@ class SRGQN(nn.Module):
         x_query, kl = self.generator(xq, view_cell_query)
         return x_query, kl
 
-    def step_query_view_sample(self, scene_cell, vq):
+    def step_query_view_sample(self, scene_cell, vq, steps=None):
         ren_cell_query = self.wrd2ren(scene_cell, vq)
-        view_cell_query = self.renderer(ren_cell_query)
+        view_cell_query = self.renderer(ren_cell_query, steps)
         x_query = self.generator.sample((64,64), view_cell_query)
         return x_query
 
-    def forward(self, x, v, xq, vq, n_obs=4):
+    def forward(self, x, v, xq, vq, n_obs=3):
         # Observation Encode
         wrd_cell = self.step_observation_encode(x, v)
         # Scene Fusion
@@ -67,23 +67,11 @@ class SRGQN(nn.Module):
         x_query, kl = self.step_query_view(scene_cell, xq, vq)
         return x_query, kl
 
-    def sample(self, x, v, vq, n_obs=4):
+    def sample(self, x, v, vq, n_obs=3, steps=None):
         # Observation Encode
         wrd_cell = self.step_observation_encode(x, v)
         # Scene Fusion
         scene_cell = self.step_scene_fusion(wrd_cell, n_obs)
         # Query Image
-        x_query = self.step_query_view_sample(scene_cell, vq)
+        x_query = self.step_query_view_sample(scene_cell, vq, steps)
         return x_query
-
-    def reconstruct(self, x):
-        view_cell = self.encoder(x)
-        #view_cell = torch.sigmoid(view_cell)
-        x_rec, kl = self.generator(x, view_cell)
-        return x_rec, kl
-    
-    def reconstruct_sample(self, x):
-        view_cell = self.encoder(x)
-        #view_cell = torch.sigmoid(view_cell)
-        x_rec = self.generator.sample((64,64), view_cell)
-        return x_rec

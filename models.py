@@ -181,13 +181,14 @@ class Renderer(nn.Module):
         self.proj_layers = nn.ModuleList(proj_layers)
         self.mask_conv = Conv2d(tsize*2, 1, 3, stride=1)
         
-    def forward(self, cam_cell):
+    def forward(self, cam_cell, steps=None):
         canvas = torch.zeros(cam_cell.shape[0], self.tsize, self.canvas_shape[0], self.canvas_shape[1]).to(device)
-        for i in range(self.n_steps):
+        if steps is None or steps > self.n_steps:
+            steps = self.n_steps
+        for i in range(steps):
             draw = self.proj_layers[i](cam_cell).view(-1, self.tsize, self.canvas_shape[0], self.canvas_shape[1])
             mask = torch.sigmoid(self.mask_conv(torch.cat((draw, canvas), 1)))
             canvas = draw*mask + canvas*(1-mask)
-        #canvas = torch.softmax(canvas, 1)
         return canvas
 
 class Renderer2(nn.Module):
@@ -202,11 +203,13 @@ class Renderer2(nn.Module):
         self.proj = ProjTransform(n_cam_cells, 16*16)
         self.mask_conv = Conv2d(tsize*2, 1, 3, stride=1)
         
-    def forward(self, cam_cell):
+    def forward(self, cam_cell, steps=None):
         canvas = torch.zeros(cam_cell.shape[0], self.tsize, self.canvas_shape[0], self.canvas_shape[1]).to(device)
         cell_masks_split = torch.sigmoid(self.cell_masks)
         cell_masks_split = torch.split(cell_masks_split, 1, dim=1)
-        for i in range(self.n_steps):
+        if steps is None or steps > self.n_steps:
+            steps = self.n_steps
+        for i in range(steps):
             cmask = cell_masks_split[i]
             cam_cell_mask = cmask.repeat(cam_cell.shape[0],self.tsize,1) * cam_cell
             #proj_dist = torch.softmax(self.proj, 1)
