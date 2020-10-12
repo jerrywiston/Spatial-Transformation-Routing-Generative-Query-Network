@@ -42,7 +42,7 @@ class SRGQN(nn.Module):
         return scene_cell
     
     def step_query_view(self, scene_cell, vq, steps=None):
-        view_cell_query = self.strn.query(scene_cell, vq, steps)
+        view_cell_query = self.strn.query(scene_cell, vq, steps=steps)
         x_query = self.generator(view_cell_query)
         return x_query
     
@@ -58,6 +58,6 @@ class SRGQN(nn.Module):
         # Scene Fusion
         scene_cell = self.step_scene_fusion(wrd_cell, n_obs)
         # Query Image
-        x_query = self.step_query_view(scene_cell, xq, vq, steps=steps)
+        x_query = self.step_query_view(scene_cell, vq, steps=steps)
         return x_query
 

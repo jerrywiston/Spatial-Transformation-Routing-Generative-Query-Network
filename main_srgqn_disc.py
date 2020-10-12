@@ -23,7 +23,7 @@ def draw_result(net, dataset, obs_size=3, gen_size=5):
         x_obs = image[:,:obs_size].reshape(-1,3,64,64).to(device)
         v_obs = pose[:,:obs_size].reshape(-1,7).to(device)
         v_query = pose[:,obs_size+1].to(device)
-        x_query = net.sample(x_obs, v_obs, v_query, n_obs=obs_size)
+        x_query = net(x_obs, v_obs, v_query, n_obs=obs_size)
         # Draw Observation
         canvas = np.zeros((64*gen_size,64*(obs_size+2),3), dtype=np.uint8)
         x_obs_draw = (image[:gen_size,:obs_size].detach()*255).permute(0,3,1,4,2).cpu().numpy().astype(np.uint8)
@@ -53,7 +53,6 @@ def draw_result(net, dataset, obs_size=3, gen_size=5):
 def eval(net, dataset, obs_size=4):
     data_loader = DataLoader(dataset, batch_size=1, shuffle=False)
     lh_record = []
-    kl_record = []
     for it, batch in enumerate(data_loader):
         image = batch[0].squeeze(0)
         pose = batch[1].squeeze(0)
@@ -63,20 +62,16 @@ def eval(net, dataset, obs_size=4):
         v_query = pose[:,obs_size+1].to(device)
         x_query_gt = image[:,obs_size+1].to(device)
         with torch.no_grad():
-            x_query_sample = net.sample(x_obs, v_obs, v_query, n_obs=obs_size)
-            x_query, kl_query = net(x_obs, v_obs, x_query_gt, v_query, n_obs=obs_size)
-            kl_query = torch.mean(torch.sum(kl_query, dim=[1,2,3])).cpu().numpy()
+            x_query_sample = net(x_obs, v_obs, v_query, n_obs=obs_size)
             mse_batch = nn.MSELoss()(x_query_sample, x_query_gt).cpu().numpy()
             lh_query = mse_batch.mean()
             lh_query_var = mse_batch.var()
             lh_record.append(lh_query)
-            kl_record.append(kl_query)
-        print("\r[Eval %s/%s] MSE: %f| KL: %f"%(str(it).zfill(4), str(len(dataset)).zfill(4), lh_query, kl_query), end="")
+        print("\r[Eval %s/%s] MSE: %f"%(str(it).zfill(4), str(len(dataset)).zfill(4), lh_query), end="")
     lh_mean = np.array(lh_record).mean()
     lh_mean_var = np.array(lh_query_var).mean()
-    kl_mean = np.array(kl_record).mean()
-    print("\nMSE =", lh_mean, ", KL =", kl_mean)
-    return float(lh_mean), float(kl_mean), lh_record, kl_record
+    print("\nMSE =", lh_mean)
+    return float(lh_mean), lh_record
 
 ############ Parameter Parsing ############
 parser = argparse.ArgumentParser(description='Traning parameters of SR-GQN.')
@@ -164,10 +159,8 @@ for epoch in range(1,total_epoch+1):
 
         # ------------ Forward ------------
         net.zero_grad()
-        x_query, kl_query = net(x_obs, v_obs, x_query_gt, v_query, n_obs=obs_size)
-        lh_query = nn.MSELoss()(x_query, x_query_gt).mean()
-        kl_query = torch.mean(torch.sum(kl_query, dim=[1,2,3]))
-        loss_query = lh_query + 0.01*kl_query
+        x_query = net(x_obs, v_obs, v_query, n_obs=obs_size)
+        loss_query = nn.MSELoss()(x_query, x_query_gt).mean()
 
         # ------------ Train ------------
         loss_query.backward()
@@ -176,16 +169,12 @@ for epoch in range(1,total_epoch+1):
         # ------------ Print Result ------------
         if it % 100 == 0:
             loss_query = float(loss_query.detach().cpu().numpy())
-            lh_query = float(lh_query.detach().cpu().numpy())
-            kl_query = float(kl_query.detach().cpu().numpy())
 
-            print("[Ep %s/%s (%s/%s)] loss_q: %f| lh_q: %f| kl_q: %f"%( \
+            print("[Ep %s/%s (%s/%s)] loss_q: %f"%( \
                 str(epoch).zfill(4), str(total_epoch).zfill(4), str(it).zfill(4), str(len(train_dataset)).zfill(4), \
-                loss_query, lh_query, kl_query))
+                loss_query))
             
             loss_query_list.append(loss_query)
-            lh_query_list.append(lh_query)
-            kl_query_list.append(kl_query)
 
     # ------------ Output Image ------------
     print("Generate image ...")
@@ -203,7 +192,6 @@ for epoch in range(1,total_epoch+1):
     # ------------ Training Record ------------
     train_record["loss_query"].append(loss_query_list)
     train_record["lh_query"].append(lh_query_list)
-    train_record["kl_query"].append(kl_query_list)
     if epoch % 5 == 0:
         print("Dump training record ...")
         with open(model_path+'train_record.json', 'w') as file:
@@ -211,13 +199,11 @@ for epoch in range(1,total_epoch+1):
 
     # ------------ Evaluation Record ------------
     print("Evaluate Training Data ...")
-    lh_train, kl_train, _, _ = eval(net, train_dataset, obs_size=3)
+    lh_train, _ = eval(net, train_dataset, obs_size=3)
     print("Evaluate Testing Data ...")
-    lh_test, kl_test, _, _ = eval(net, test_dataset, obs_size=3)
+    lh_test, _ = eval(net, test_dataset, obs_size=3)
     eval_record["mse_train"].append(lh_train)
-    eval_record["kl_train"].append(kl_train)
     eval_record["mse_test"].append(lh_test)
-    eval_record["kl_test"].append(kl_test)
     print("Dump evaluation record ...")
     with open(model_path+'eval_record.json', 'w') as file:
         json.dump(eval_record, file)

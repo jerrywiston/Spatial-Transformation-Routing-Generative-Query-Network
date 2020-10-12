@@ -53,7 +53,7 @@ class STRN(nn.Module):
         if steps is None:
             steps = self.n_occ_layers
         # Start Rendering
-        for i in range(steps, steps+1):
+        for i in range(steps):
             mask_wrd_cell = wrd_cell * occ_mask[i].permute(0,2,1).repeat(1,self.tsize,1)
             draw = torch.bmm(wrd_cell, route).reshape(-1, self.tsize, canvas_shape[0], canvas_shape[1])
             #mask = torch.sigmoid(self.mask_conv(torch.cat((query_view_cell, draw), 1)))
