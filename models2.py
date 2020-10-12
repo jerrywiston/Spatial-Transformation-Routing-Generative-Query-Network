@@ -43,18 +43,21 @@ class STRN(nn.Module):
         wrd_cell = torch.bmm(view_cell, route.permute(0,2,1))
         return wrd_cell # (-1, ch, n_tgt_cells)
     
-    def query(self, wrd_cell, v, canvas_shape=(16,16)):
+    def query(self, wrd_cell, v, canvas_shape=(16,16), steps=None):
         attention, activation, occluding = self.transform(v, True)
         route = attention * activation   # (-1, n_tgt_cells, n_src_cells)
         occ_mask = torch.split(occluding, 1, dim=2)
         
         # Initialize Canvas
         query_view_cell = torch.zeros(wrd_cell.shape[0], self.tsize, canvas_shape[0], canvas_shape[1]).to(device)
+        if steps is None:
+            steps = self.n_occ_layers
         # Start Rendering
-        for i in range(self.n_occ_layers):
+        for i in range(steps):
             mask_wrd_cell = wrd_cell * occ_mask[i].permute(0,2,1).repeat(1,self.tsize,1)
             draw = torch.bmm(wrd_cell, route).reshape(-1, self.tsize, canvas_shape[0], canvas_shape[1])
-            mask = torch.sigmoid(self.mask_conv(torch.cat((query_view_cell, draw), 1)))
+            #mask = torch.sigmoid(self.mask_conv(torch.cat((query_view_cell, draw), 1)))
+            mask = torch.max(draw, dim=1, keepdim=True)
             query_view_cell = draw*mask + query_view_cell*(1-mask)
         
         return query_view_cell

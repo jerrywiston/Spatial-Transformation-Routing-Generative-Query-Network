@@ -41,23 +41,23 @@ class SRGQN(nn.Module):
         scene_cell = torch.sigmoid(scene_cell)
         return scene_cell
     
-    def step_query_view(self, scene_cell, xq, vq):
-        view_cell_query = self.strn.query(scene_cell, vq)
+    def step_query_view(self, scene_cell, xq, vq, steps=None):
+        view_cell_query = self.strn.query(scene_cell, vq, steps)
         x_query, kl = self.generator(xq, view_cell_query)
         return x_query, kl
 
     def step_query_view_sample(self, scene_cell, vq, steps=None):
-        view_cell_query = self.strn.query(scene_cell, vq)
+        view_cell_query = self.strn.query(scene_cell, vq, steps)
         x_query = self.generator.sample((64,64), view_cell_query)
         return x_query
 
-    def forward(self, x, v, xq, vq, n_obs=3):
+    def forward(self, x, v, xq, vq, n_obs=3, steps=None):
         # Observation Encode
         wrd_cell = self.step_observation_encode(x, v)
         # Scene Fusion
         scene_cell = self.step_scene_fusion(wrd_cell, n_obs)
         # Query Image
-        x_query, kl = self.step_query_view(scene_cell, xq, vq)
+        x_query, kl = self.step_query_view(scene_cell, xq, vq, steps)
         return x_query, kl
 
     def sample(self, x, v, vq, n_obs=3, steps=None):
