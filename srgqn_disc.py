@@ -29,7 +29,7 @@ class SRGQN(nn.Module):
 
         self.encoder = models.Encoder(ch, tsize).to(device)
         self.strn = models2.STRN(16*16, n_wrd_cells, vsize=vsize, ch=64).to(device)
-        self.generator = generator.Decoder(ch, tsize).to(device)
+        self.generator = models.Decoder(ch, tsize).to(device)
 
     def step_observation_encode(self, x, v):
         view_cell = self.encoder(x).reshape(-1, self.tsize, 16*16)
