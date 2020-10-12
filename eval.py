@@ -10,7 +10,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
  
-from srgqn import SRGQN
+from srgqn2 import SRGQN
 from dataset import GqnDatasets
 
 ############ Util Functions ############
@@ -22,7 +22,7 @@ def draw_result(net, dataset, obs_size=3, gen_size=5):
         # Get Data
         x_obs = image[:,:obs_size].reshape(-1,3,64,64).to(device)
         v_obs = pose[:,:obs_size].reshape(-1,7).to(device)
-        v_query = pose[:,obs_size+1].to(device)
+        v_query = pose[:,obs_size].to(device)
         x_query = net.sample(x_obs, v_obs, v_query, n_obs=obs_size)
         # Draw Observation
         canvas = np.zeros((64*gen_size,64*(obs_size+2),3), dtype=np.uint8)
@@ -30,7 +30,7 @@ def draw_result(net, dataset, obs_size=3, gen_size=5):
         x_obs_draw = cv2.cvtColor(x_obs_draw.reshape(64*gen_size,64*obs_size,3), cv2.COLOR_BGR2RGB)
         canvas[:64*gen_size,:64*obs_size,:] = x_obs_draw
         # Draw Query GT
-        x_gt_draw = (image[:gen_size,obs_size+1].detach()*255).permute(0,2,3,1).cpu().numpy().astype(np.uint8)
+        x_gt_draw = (image[:gen_size,obs_size].detach()*255).permute(0,2,3,1).cpu().numpy().astype(np.uint8)
         x_gt_draw = cv2.cvtColor(x_gt_draw.reshape(64*gen_size,64,3), cv2.COLOR_BGR2RGB)
         canvas[:,64*(obs_size):64*(obs_size+1),:] = x_gt_draw
         # Draw Query Gen
@@ -42,7 +42,7 @@ def draw_result(net, dataset, obs_size=3, gen_size=5):
         cv2.line(canvas, (64*(obs_size+2)-1,0),(64*(obs_size+2)-1,64*gen_size),(0,0,0), 2)
         cv2.line(canvas, (64*obs_size,0),(64*obs_size,64*gen_size),(255,0,0), 2)
         cv2.line(canvas, (64*(obs_size+1),0),(64*(obs_size+1),64*gen_size),(0,0,255), 2)
-        for i in range(1,4):
+        for i in range(1,obs_size):
             canvas[:,64*i:64*i+1,:] = 0
         for i in range(gen_size):
             canvas[64*i:64*i+1,:,:] = 0
@@ -117,15 +117,43 @@ net.eval()
 ####
 train_loader = DataLoader(train_dataset, batch_size=1, shuffle=True)
 test_loader = DataLoader(test_dataset, batch_size=1, shuffle=True)
-
+'''
 print("Generate image ...")
-obs_size = 3
-gen_size = 5
-# Train
-fname = result_path+"train.png"
-canvas = draw_result(net, train_dataset, obs_size, gen_size)
-cv2.imwrite(fname, canvas)
-# Test
-fname = result_path+"_est.png"
-canvas = draw_result(net, test_dataset, obs_size, gen_size)
-cv2.imwrite(fname, canvas)
+gen_size = 10
+for i in range(1,10):
+    obs_size = i
+    # Train
+    fname = result_path + "train_" + "obs" + str(i) + ".png"
+    canvas = draw_result(net, train_dataset, obs_size, gen_size)
+    cv2.imwrite(fname, canvas)
+    # Test
+    fname = result_path + "test_" + "obs" + str(i) + ".png"
+    canvas = draw_result(net, test_dataset, obs_size, gen_size)
+    cv2.imwrite(fname, canvas)
+'''
+##############################
+data_loader = DataLoader(test_dataset, batch_size=1, shuffle=False)
+
+for it, batch in enumerate(data_loader):
+    image = batch[0].squeeze(0)
+    pose = batch[1].squeeze(0)
+    obs_size = 3
+    x_obs = image[0,0].permute(1,2,0).numpy()
+    x_query = image[0,1].permute(1,2,0).numpy()
+    v_obs = pose[0,0].reshape(-1,7).to(device)
+    v_query = pose[0,1].to(device)
+    view_cell_sim = np.zeros([16,16,128])
+    view_cell_sim[12,12,:] = 1
+    view_cell_torch = torch.FloatTensor(view_cell_sim).reshape(1,16,16,128).permute(0,3,1,2).to(device)
+    routing = net.visualize_routing(view_cell_torch, v_obs, v_query, 3)
+    routing = 10*routing.permute(0,2,3,1).detach().cpu().reshape(16,16,128).numpy()
+
+    img = cv2.resize(view_cell_sim[:,:,0:3], (256,256), interpolation=cv2.INTER_CUBIC)
+    img2 = cv2.resize(routing[:,:,0:3], (256,256), interpolation=cv2.INTER_CUBIC)
+    x_obs = cv2.resize(x_obs, (256,256), interpolation=cv2.INTER_CUBIC)
+    x_query = cv2.resize(x_query, (256,256), interpolation=cv2.INTER_CUBIC)
+    cv2.imshow("test", img)
+    cv2.imshow("test2", img2)
+    cv2.imshow("x_obs", x_obs)
+    cv2.imshow("x_query", x_query)
+    cv2.waitKey(0)

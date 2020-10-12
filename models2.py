@@ -20,7 +20,7 @@ class STRN(nn.Module):
         self.fc4_att = nn.Linear(int(n_src_cells/2), n_src_cells)
         self.fc4_act = nn.Linear(int(n_src_cells/2), 1)
         self.fc4_occ = nn.Linear(int(n_src_cells/2), n_occ_layers)
-        self.mask_conv = Conv2d(tsize*2, 1, 3, stride=1)
+        #self.mask_conv = Conv2d(tsize*2, 1, 3, stride=1)
       
     def transform(self, v, inv=False):
         h1 = F.relu(self.fc1(v))
@@ -53,11 +53,11 @@ class STRN(nn.Module):
         if steps is None:
             steps = self.n_occ_layers
         # Start Rendering
-        for i in range(steps):
+        for i in range(steps, steps+1):
             mask_wrd_cell = wrd_cell * occ_mask[i].permute(0,2,1).repeat(1,self.tsize,1)
             draw = torch.bmm(wrd_cell, route).reshape(-1, self.tsize, canvas_shape[0], canvas_shape[1])
             #mask = torch.sigmoid(self.mask_conv(torch.cat((query_view_cell, draw), 1)))
-            mask = torch.max(draw, dim=1, keepdim=True)
+            mask, _ = torch.max(draw, dim=1, keepdim=True)
             query_view_cell = draw*mask + query_view_cell*(1-mask)
         
         return query_view_cell

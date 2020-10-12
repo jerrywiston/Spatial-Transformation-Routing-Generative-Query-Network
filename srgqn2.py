@@ -47,9 +47,15 @@ class SRGQN(nn.Module):
         return x_query, kl
 
     def step_query_view_sample(self, scene_cell, vq, steps=None):
-        view_cell_query = self.strn.query(scene_cell, vq, steps)
+        view_cell_query = self.strn.query(scene_cell, vq, steps=steps)
         x_query = self.generator.sample((64,64), view_cell_query)
         return x_query
+    
+    def visualize_routing(self, view_cell, v, vq, steps=None):
+        wrd_cell = self.strn(view_cell.reshape(-1, self.tsize, 16*16), v)
+        scene_cell = torch.sigmoid(wrd_cell)
+        view_cell_query = self.strn.query(scene_cell, vq, steps=steps)
+        return view_cell_query
 
     def forward(self, x, v, xq, vq, n_obs=3, steps=None):
         # Observation Encode
@@ -57,7 +63,7 @@ class SRGQN(nn.Module):
         # Scene Fusion
         scene_cell = self.step_scene_fusion(wrd_cell, n_obs)
         # Query Image
-        x_query, kl = self.step_query_view(scene_cell, xq, vq, steps)
+        x_query, kl = self.step_query_view(scene_cell, xq, vq, steps=steps)
         return x_query, kl
 
     def sample(self, x, v, vq, n_obs=3, steps=None):
@@ -66,5 +72,5 @@ class SRGQN(nn.Module):
         # Scene Fusion
         scene_cell = self.step_scene_fusion(wrd_cell, n_obs)
         # Query Image
-        x_query = self.step_query_view_sample(scene_cell, vq, steps)
+        x_query = self.step_query_view_sample(scene_cell, vq, steps=steps)
         return x_query
