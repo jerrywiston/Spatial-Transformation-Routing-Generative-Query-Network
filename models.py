@@ -244,7 +244,7 @@ class Decoder(nn.Module):
             nn.Sigmoid(),
         )
 
-    def forward(self, h):
-        h = torch.softmax(h, 1)
-        x_re = self.net(h)
+    def forward(self, r):
+        feature = r.reshape(-1,self.tsize,16,16)
+        x_re = self.net(feature)
         return x_re
