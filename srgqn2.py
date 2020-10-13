@@ -42,7 +42,7 @@ class SRGQN(nn.Module):
         return scene_cell
     
     def step_query_view(self, scene_cell, xq, vq, steps=None):
-        view_cell_query = self.strn.query(scene_cell, vq, steps)
+        view_cell_query = self.strn.query(scene_cell, vq, steps=steps)
         x_query, kl = self.generator(xq, view_cell_query)
         return x_query, kl
 
