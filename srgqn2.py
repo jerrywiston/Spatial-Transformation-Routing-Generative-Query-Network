@@ -53,8 +53,14 @@ class SRGQN(nn.Module):
     
     def visualize_routing(self, view_cell, v, vq, steps=None):
         wrd_cell = self.strn(view_cell.reshape(-1, self.tsize, 16*16), v)
-        scene_cell = torch.sigmoid(wrd_cell)
+        scene_cell = wrd_cell
         view_cell_query = self.strn.query(scene_cell, vq, steps=steps)
+        #for i in range(128):
+        #    print(scene_cell[0,0,i])
+        #for i in range(16):
+        #    for j in range(16):    
+        #        print(i,j)
+        #        print(view_cell_query[0,0,i,j])
         return view_cell_query
 
     def forward(self, x, v, xq, vq, n_obs=3, steps=None):
