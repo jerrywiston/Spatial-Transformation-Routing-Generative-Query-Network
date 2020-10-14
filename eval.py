@@ -114,7 +114,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 net = SRGQN(n_wrd_cells=args.w, n_ren_cells=args.r, tsize=args.c, ch=64, vsize=7).to(device)
 net.load_state_dict(torch.load(save_path+"srgqn.pth"))
 net.eval()
-'''
+
 ####
 train_loader = DataLoader(train_dataset, batch_size=1, shuffle=True)
 test_loader = DataLoader(test_dataset, batch_size=1, shuffle=True)
@@ -137,7 +137,7 @@ for i in range(6):
     fname = result_path + "draw_" + str(i) + ".png"
     canvas = draw_result(net, train_dataset, obs_size, gen_size, steps=i)
     cv2.imwrite(fname, canvas)
-'''
+
 ##############################
 data_loader = DataLoader(test_dataset, batch_size=1, shuffle=False)
 
@@ -149,8 +149,15 @@ for it, batch in enumerate(data_loader):
     x_query = image[0,1].permute(1,2,0).numpy()
     v_obs = pose[0,0].reshape(-1,7).to(device)
     v_query = pose[0,1].to(device)
+    print(v_obs, v_query)
+
     view_cell_sim = np.zeros([16,16,128])
-    view_cell_sim[12,0,:] = 10
+    spos = (10,9)
+    #spos = (10,2)
+    mag = 10.0
+    kernal = np.array([[1,2,1],[2,8,2],[1,2,1]])
+    for i in range(3):
+        view_cell_sim[spos[0]-1:spos[0]+2,spos[1]-1:spos[1]+2,i] = kernal
     view_cell_torch = torch.FloatTensor(view_cell_sim).reshape(1,16,16,128).permute(0,3,1,2).to(device)
     rlist = []
     for j in range(1,6):
@@ -158,17 +165,37 @@ for it, batch in enumerate(data_loader):
         routing = routing.permute(0,2,3,1).detach().cpu().reshape(16,16,128).numpy()
         rlist.append(routing)
 
-    img = cv2.resize(view_cell_sim[:,:,0:3], (256,256), interpolation=cv2.INTER_NEAREST)
-    img2 = cv2.resize(rlist[3][:,:,0:3], (256,256), interpolation=cv2.INTER_NEAREST)
+    img_size = (128,128)
+    signal_obs = cv2.resize(view_cell_sim[:,:,0:3]/mag, img_size, interpolation=cv2.INTER_NEAREST)
+    signal_query = cv2.resize(rlist[3][:,:,0:3], img_size, interpolation=cv2.INTER_NEAREST)
+    signal_query = np.minimum(signal_query, 1.0)
     x_obs = cv2.cvtColor(x_obs, cv2.COLOR_BGR2RGB)
-    x_obs = cv2.resize(x_obs, (256,256), interpolation=cv2.INTER_NEAREST)
+    x_obs = cv2.resize(x_obs, img_size, interpolation=cv2.INTER_NEAREST)
     x_query = cv2.cvtColor(x_query, cv2.COLOR_BGR2RGB)
-    x_query = cv2.resize(x_query, (256,256), interpolation=cv2.INTER_NEAREST)
-    cv2.imshow("test", img)
-    cv2.imshow("test2", img2)
+    x_query = cv2.resize(x_query, img_size, interpolation=cv2.INTER_NEAREST)
+    x_obs_mask = x_obs * (signal_obs*0.7+0.3)
+    x_query_mask = x_query * (signal_query*0.7+0.3)
+
+    img_canvas = np.zeros([img_size[0]*2, img_size[0]*3, 3])
+    img_canvas[0:img_size[1],0:img_size[0],:] = x_obs
+    img_canvas[0:img_size[1],img_size[0]:img_size[0]*2,:] = x_obs_mask
+    img_canvas[0:img_size[1],img_size[0]*2:img_size[0]*3,:] = signal_obs
+    img_canvas[img_size[1]:img_size[1]*2,0:img_size[0],:] = x_query
+    img_canvas[img_size[1]:img_size[1]*2,img_size[0]:img_size[0]*2,:] = x_query_mask
+    img_canvas[img_size[1]:img_size[1]*2,img_size[0]*2:img_size[0]*3,:] = signal_query
+    fname = result_path + "route_" + str(it).zfill(2) + ".png"
+    cv2.imwrite(fname, img_canvas*255)
+
+    '''
+    cv2.imshow("signal_obs", signal_obs)
+    cv2.imshow("signal_query", signal_query)
     cv2.imshow("x_obs", x_obs)
     cv2.imshow("x_query", x_query)
+    cv2.imshow("x_obs_mask", x_obs_mask)
+    cv2.imshow("x_query_mask", x_query_mask)
+    cv2.imshow("canvas", img_canvas)
     k = cv2.waitKey(0)
     if k == ord('q'):
         break
+    '''
 

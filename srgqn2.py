@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import models
-import models2
+import models2 #as models2
 import generator
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -55,12 +55,6 @@ class SRGQN(nn.Module):
         wrd_cell = self.strn(view_cell.reshape(-1, self.tsize, 16*16), v)
         scene_cell = wrd_cell
         view_cell_query = self.strn.query(scene_cell, vq, steps=steps)
-        #for i in range(128):
-        #    print(scene_cell[0,0,i])
-        #for i in range(16):
-        #    for j in range(16):    
-        #        print(i,j)
-        #        print(view_cell_query[0,0,i,j])
         return view_cell_query
 
     def forward(self, x, v, xq, vq, n_obs=3, steps=None):
