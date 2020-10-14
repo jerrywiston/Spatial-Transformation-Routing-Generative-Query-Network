@@ -133,7 +133,7 @@ for i in range(1,10):
     cv2.imwrite(fname, canvas)
 
 obs_size = 3
-for i in range(6):
+for i in range(4):
     fname = result_path + "draw_" + str(i) + ".png"
     canvas = draw_result(net, train_dataset, obs_size, gen_size, steps=i)
     cv2.imwrite(fname, canvas)
@@ -148,7 +148,7 @@ for it, batch in enumerate(data_loader):
     x_obs = image[0,0].permute(1,2,0).numpy()
     x_query = image[0,1].permute(1,2,0).numpy()
     v_obs = pose[0,0].reshape(-1,7).to(device)
-    v_query = pose[0,1].to(device)
+    v_query = pose[0,1].reshape(-1,7).to(device)
     print(v_obs, v_query)
 
     view_cell_sim = np.zeros([16,16,128])

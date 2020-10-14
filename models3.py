@@ -44,6 +44,7 @@ class STRN(nn.Module):
         h1_view = F.relu(self.fc1_view(view_code)) #(256, 128)
         view_emb = torch.unsqueeze(self.fc2_view(h1_view), 0).repeat(v.shape[0], 1, 1) #(-1, view_cell, emb_size)
         wrd_emb = self.fc4_emb(h3).view(-1, self.n_tgt_cells, self.emb_size) #(-1, wrd_cell, emb_size)
+        print(view_emb.shape, wrd_emb.shape)
         relation = torch.bmm(wrd_emb, view_emb.permute(0,2,1)) #(-1, wrd_cell, view_cell)
         if not inv:
             attention = torch.softmax(relation, 2)
