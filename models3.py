@@ -44,7 +44,7 @@ class STRN(nn.Module):
         h1_view = F.relu(self.fc1_view(view_code)) #(256, 128)
         view_emb = torch.unsqueeze(self.fc2_view(h1_view), 0).repeat(v.shape[0], 1, 1) #(-1, view_cell, emb_size)
         wrd_emb = self.fc4_emb(h3).view(-1, self.n_tgt_cells, self.emb_size) #(-1, wrd_cell, emb_size)
-        print(view_emb.shape, wrd_emb.shape)
+        #print(view_emb.shape, wrd_emb.shape)
         relation = torch.bmm(wrd_emb, view_emb.permute(0,2,1)) #(-1, wrd_cell, view_cell)
         if not inv:
             attention = torch.softmax(relation, 2)
@@ -52,14 +52,15 @@ class STRN(nn.Module):
             attention = torch.softmax(relation, 1)
         return attention, activation, occluding
 
-    def forward(self, view_cell, v):
-        attention, activation, occluding = self.transform(v)
+    def forward(self, view_cell, v, im_size=(16,16)):
+        attention, activation, occluding = self.transform(v, im_size=im_size)
         route = attention * activation   # (-1, n_tgt_cells, n_src_cells)
         wrd_cell = torch.bmm(view_cell, route.permute(0,2,1))
         return wrd_cell # (-1, ch, n_tgt_cells)
     
     def query(self, wrd_cell, v, canvas_shape=(16,16), steps=None):
-        attention, activation, occluding = self.transform(v, True)
+        attention, activation, occluding = self.transform(v, True, im_size=canvas_shape)
+        #print(torch.min(attention), torch.max(attention))
         route = attention * activation   # (-1, n_tgt_cells, n_src_cells)
         occ_mask = torch.split(occluding, 1, dim=2)
         

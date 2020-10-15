@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import models
-import models2 #as models2
+import models3 as models2
 import generator
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -31,9 +31,9 @@ class SRGQN(nn.Module):
         self.strn = models2.STRN(16*16, n_wrd_cells, vsize=vsize, ch=64).to(device)
         self.generator = generator.GeneratorNetwork(x_dim=3, r_dim=tsize, L=6).to(device)
 
-    def step_observation_encode(self, x, v):
+    def step_observation_encode(self, x, v, im_size=(16,16)):
         view_cell = self.encoder(x).reshape(-1, self.tsize, 16*16)
-        wrd_cell = self.strn(view_cell, v)
+        wrd_cell = self.strn(view_cell, v, im_size=im_size)
         return wrd_cell
     
     def step_scene_fusion(self, wrd_cell, n_obs): # mode=sum/mean
@@ -51,13 +51,13 @@ class SRGQN(nn.Module):
         x_query = self.generator.sample((64,64), view_cell_query)
         return x_query
     
-    def visualize_routing(self, view_cell, v, vq, steps=None):
-        wrd_cell = self.strn(view_cell.reshape(-1, self.tsize, 16*16), v)
+    def visualize_routing(self, view_cell, v, vq, steps=None, im_size=(16,16)):
+        wrd_cell = self.strn(view_cell.reshape(-1, self.tsize, im_size[0]*im_size[1]), v, im_size=im_size)
         scene_cell = wrd_cell
-        view_cell_query = self.strn.query(scene_cell, vq, steps=steps)
+        view_cell_query = self.strn.query(scene_cell, vq, steps=steps, canvas_shape=im_size)
         return view_cell_query
 
-    def forward(self, x, v, xq, vq, n_obs=3, steps=None):
+    def forward(self, x, v, xq, vq, n_obs=3, steps=None, im_size=(16,16)):
         # Observation Encode
         wrd_cell = self.step_observation_encode(x, v)
         # Scene Fusion
