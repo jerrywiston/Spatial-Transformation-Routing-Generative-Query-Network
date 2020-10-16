@@ -155,11 +155,14 @@ for it, batch in enumerate(data_loader):
     view_cell_sim = np.zeros([32,32,128])
     #spos = (10,9)
     spos = (20,18)
-    mag = 10.0
-    kernal = np.array([[1,2,1],[2,8,2],[1,2,1]])
+    mag = 15.0
+    #kernal = np.array([[1,2,1],[2,8,2],[1,2,1]])
     #kernal = np.array([[0,0,0],[0,10,0],[0,0,0]])
+    #kernal = np.array([[1,4,7,4,1],[4,16,26,16,4],[7,26,41,26,7],[4,16,26,16,4],[1,4,7,4,1]])
+    kernal = np.array([[2,4,5,4,2],[4,9,12,9,4],[5,12,15,12,5],[4,9,12,9,4],[2,4,5,4,2]])
+
     for i in range(3):
-        view_cell_sim[spos[0]-1:spos[0]+2,spos[1]-1:spos[1]+2,i] = kernal
+        view_cell_sim[spos[0]-2:spos[0]+3,spos[1]-2:spos[1]+3,i] = kernal
     view_cell_sim /= mag
     #view_cell_torch = torch.FloatTensor(view_cell_sim).reshape(1,16,16,128).permute(0,3,1,2).to(device)
     view_cell_torch = torch.FloatTensor(view_cell_sim).reshape(1,32,32,128).permute(0,3,1,2).to(device)
@@ -174,8 +177,7 @@ for it, batch in enumerate(data_loader):
     signal_obs = cv2.resize(view_cell_sim[:,:,0:3], img_size, interpolation=cv2.INTER_NEAREST)
     signal_query = cv2.resize(rlist[3][:,:,0:3], img_size, interpolation=cv2.INTER_NEAREST)
     print(np.max(signal_query))
-    #signal_query = np.minimum(5*signal_query, 1.0)
-    signal_query = np.minimum(20*signal_query, 1.0)
+    signal_query = np.minimum(5*signal_query, 1.0)
     x_obs = cv2.cvtColor(x_obs, cv2.COLOR_BGR2RGB)
     x_obs = cv2.resize(x_obs, img_size, interpolation=cv2.INTER_NEAREST)
     x_query = cv2.cvtColor(x_query, cv2.COLOR_BGR2RGB)
