@@ -80,21 +80,24 @@ class STRN(nn.Module):
         wrd_cell = torch.bmm(view_cell, route.permute(0,2,1))
         return wrd_cell # (-1, csize, n_wrd_cells)
     
-    def query(self, wrd_cell, v, view_size=(16,16), steps=None):
+    def query(self, wrd_cell, v, view_size=(16,16), steps=None, occlusion=True):
         distribution, activation, occluding = self.transform(v, inv=True, view_size=view_size)
         route = distribution * activation   # (-1, n_wrd_cells, n_view_cells)
         occ_mask = torch.split(occluding, 1, dim=2)
         
-        # Initialize Canvas
-        mask_wrd_cell = wrd_cell * occ_mask[0].permute(0,2,1).repeat(1,self.csize,1)
-        query_view_cell = torch.bmm(mask_wrd_cell, route).reshape(-1, self.csize, view_size[0], view_size[1])
-        if steps is None:
-            steps = self.n_occ_layers
-        # Start Rendering
-        for i in range(0,steps):
-            mask_wrd_cell = wrd_cell * occ_mask[i].permute(0,2,1).repeat(1,self.csize,1)
-            draw = torch.bmm(mask_wrd_cell, route).reshape(-1, self.csize, view_size[0], view_size[1])
-            mask, _ = torch.max(draw, dim=1, keepdim=True)
-            query_view_cell = draw*mask + query_view_cell*(1-mask)
+        if occlusion:
+            # Initialize Canvas
+            mask_wrd_cell = wrd_cell * occ_mask[0].permute(0,2,1).repeat(1,self.csize,1)
+            query_view_cell = torch.bmm(mask_wrd_cell, route).reshape(-1, self.csize, view_size[0], view_size[1])
+            if steps is None:
+                steps = self.n_occ_layers
+            # Start Rendering
+            for i in range(0,steps):
+                mask_wrd_cell = wrd_cell * occ_mask[i].permute(0,2,1).repeat(1,self.csize,1)
+                draw = torch.bmm(mask_wrd_cell, route).reshape(-1, self.csize, view_size[0], view_size[1])
+                mask, _ = torch.max(draw, dim=1, keepdim=True)
+                query_view_cell = draw*mask + query_view_cell*(1-mask)
+        else:
+            query_view_cell = torch.bmm(wrd_cell, route).reshape(-1, self.csize, view_size[0], view_size[1])
         
         return query_view_cell

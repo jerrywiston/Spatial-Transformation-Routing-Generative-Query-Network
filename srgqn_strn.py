@@ -51,9 +51,9 @@ class SRGQN(nn.Module):
         return x_query
     
     def visualize_routing(self, view_cell, v, vq, steps=None, view_size=(16,16)):
-        wrd_cell = self.strn(view_cell.reshape(-1, self.tsize, im_size[0]*im_size[1]), v, view_size=view_size)
+        wrd_cell = self.strn(view_cell.reshape(-1, self.csize, view_size[0]*view_size[1]), v, view_size=view_size)
         scene_cell = wrd_cell
-        view_cell_query = self.strn.query(scene_cell, vq, steps=steps, canvas_shape=im_size)
+        view_cell_query = self.strn.query(scene_cell, vq, steps=steps, view_size=view_size, occlusion=False)
         return view_cell_query
 
     def forward(self, x, v, xq, vq, n_obs=3, steps=None):
