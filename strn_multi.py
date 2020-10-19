@@ -17,53 +17,48 @@ class STRN(nn.Module):
         self.csize = csize
 
         # Location Code Extracting for World Cells
-        self.wcode_net = nn.Sequential(
+        self.w2c = nn.Sequential(
             nn.Linear(vsize, 512),
             nn.ReLU(inplace=True),
             nn.Linear(512, wcode_size*n_wrd_cells),
         )
-
-        # Camera Space Embedding Network
-        self.cse_net = nn.Sequential(
-            nn.Linear(wcode_size, 128),
-            nn.ReLU(inplace=True),
-            nn.Linear(128, emb_size)
-        )
-
-        # Frustum Activation Network
-        self.fa_net = nn.Sequential(
-            nn.Linear(wcode_size, 128),
-            nn.ReLU(inplace=True),
-            nn.Linear(128, 1),
-        )
-
-        # Occlusion Network
-        self.occ_net = nn.Sequential(
-            nn.Linear(wcode_size, 128),
-            nn.ReLU(inplace=True),
-            nn.Linear(128, n_occ_layers)
-        )
+        
+        # Camera Space Embedding / Frustum Activation / Occlusion
+        self.fc1 = nn.Linear(wcode_size, 256)
+        self.fc2 = nn.Linear(256, 256)
+        self.fc_act = nn.Linear(256, 1)
+        self.fc_occ = nn.Linear(256, n_occ_layers)
+        self.fc_emb = nn.Linear(256, emb_size)
 
         # View Space Embedding Network
-        self.vse_net = nn.Sequential(
+        self.vse = nn.Sequential(
             nn.Linear(2, 128),
             nn.ReLU(inplace=True),
             nn.Linear(128, emb_size)
         )
 
+        # Mask Convolution
+        #self.conv_mask = nn.Sequential(
+        #    Conv2d(self.csize, 32, 1, stride=1)
+        #    nn.ReLU(inplace=True),
+        #    Conv2d(32, 1, 1, stride=1)
+        #)
+
     def transform(self, v, inv=False, view_size=(16,16)):
         # Camera Space Embedding
-        wcode = self.wcode_net(v).view(-1, self.wcode_size)
-        activation = torch.sigmoid(self.fa_net(wcode).view(-1, self.n_wrd_cells, 1))
-        occluding = torch.softmax(self.occ_net(wcode).view(-1, self.n_wrd_cells, self.n_occ_layers), 2)
-        cs_embedding = self.cse_net(wcode).view(-1, self.n_wrd_cells, self.emb_size)
+        wcode = self.w2c(v).view(-1, self.wcode_size)
+        h = F.relu(self.fc1(wcode))
+        h = F.relu(self.fc2(h))
+        activation = torch.sigmoid(self.fc_act(h).view(-1, self.n_wrd_cells, 1))
+        occluding = torch.softmax(self.fc_occ(h).view(-1, self.n_wrd_cells, self.n_occ_layers), 2)
+        cs_embedding = self.fc_emb(h).view(-1, self.n_wrd_cells, self.emb_size)
         
         # View Space Embedding
         x = torch.linspace(-1, 1, view_size[0])
         y = torch.linspace(-1, 1, view_size[1])
         x_grid, y_grid = torch.meshgrid(x, y)
         vcode = torch.cat((torch.unsqueeze(x_grid, 0), torch.unsqueeze(y_grid, 0)), dim=0).reshape(2,-1).permute(1,0).to(device) #(16*16, 2)
-        vs_embedding = self.vse_net(vcode) #(256, 128)
+        vs_embedding = self.vse(vcode) #(256, 128)
         vs_embedding = torch.unsqueeze(vs_embedding, 0).repeat(v.shape[0], 1, 1) #(-1, view_cell, emb_size)
         
         # Cell Distribution
@@ -96,6 +91,7 @@ class STRN(nn.Module):
                 mask_wrd_cell = wrd_cell * occ_mask[i].permute(0,2,1).repeat(1,self.csize,1)
                 draw = torch.bmm(mask_wrd_cell, route).reshape(-1, self.csize, view_size[0], view_size[1])
                 mask, _ = torch.max(draw, dim=1, keepdim=True)
+                #mask = torch.sigmoid(self.conv_mask(draw))
                 query_view_cell = draw*mask + query_view_cell*(1-mask)
         else:
             query_view_cell = torch.bmm(wrd_cell, route).reshape(-1, self.csize, view_size[0], view_size[1])
