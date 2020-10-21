@@ -151,26 +151,26 @@ for it, batch in enumerate(data_loader):
     v_query = pose[0,1].reshape(-1,7).to(device)
     #print(v_obs, v_query)
 
-    #view_cell_sim = np.zeros([16,16,128])
-    view_cell_sim = np.zeros([32,32,128])
-    #spos = (10,9)
-    spos = (20,18)
-    mag = 30#15.0
-    #kernal = np.array([[1,2,1],[2,8,2],[1,2,1]])
+    view_cell_sim = np.zeros([16,16,128])
+    #view_cell_sim = np.zeros([32,32,128])
+    spos = (10,9)
+    #spos = (20,18)
+    mag = 8#15.0
+    kernal = np.array([[1,2,1],[2,8,2],[1,2,1]])
     #kernal = np.array([[0,0,0],[0,10,0],[0,0,0]])
-    kernal = np.array([[1,4,7,4,1],[4,16,26,16,4],[7,26,41,26,7],[4,16,26,16,4],[1,4,7,4,1]])
+    #kernal = np.array([[1,4,7,4,1],[4,16,26,16,4],[7,26,41,26,7],[4,16,26,16,4],[1,4,7,4,1]])
     #kernal = np.array([[2,4,5,4,2],[4,9,12,9,4],[5,12,15,12,5],[4,9,12,9,4],[2,4,5,4,2]])
 
     for i in range(3):
-        view_cell_sim[spos[0]-2:spos[0]+3,spos[1]-2:spos[1]+3,i] = kernal
+        view_cell_sim[spos[0]-1:spos[0]+2,spos[1]-1:spos[1]+2,i] = kernal
     view_cell_sim /= mag
-    #view_cell_torch = torch.FloatTensor(view_cell_sim).reshape(1,16,16,128).permute(0,3,1,2).to(device)
-    view_cell_torch = torch.FloatTensor(view_cell_sim).reshape(1,32,32,128).permute(0,3,1,2).to(device)
+    view_cell_torch = torch.FloatTensor(view_cell_sim).reshape(1,16,16,128).permute(0,3,1,2).to(device)
+    #view_cell_torch = torch.FloatTensor(view_cell_sim).reshape(1,32,32,128).permute(0,3,1,2).to(device)
     rlist = []
     for j in range(1,6):
-        routing = net.visualize_routing(view_cell_torch, v_obs, v_query, None, im_size=(32, 32))
-        #routing = routing.permute(0,2,3,1).detach().cpu().reshape(16,16,128).numpy()
-        routing = routing.permute(0,2,3,1).detach().cpu().reshape(32,32,128).numpy()
+        routing = net.visualize_routing(view_cell_torch, v_obs, v_query, None, im_size=(16, 16))
+        routing = routing.permute(0,2,3,1).detach().cpu().reshape(16,16,128).numpy()
+        #routing = routing.permute(0,2,3,1).detach().cpu().reshape(32,32,128).numpy()
         rlist.append(routing)
 
     img_size = (128,128)
