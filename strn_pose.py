@@ -67,4 +67,13 @@ class STRN(nn.Module):
         distribution = torch.softmax(relation, 1)
         route = distribution * activation   # (-1, n_wrd_cells, n_view_cells)
         query_view_cell = torch.bmm(wrd_cell, route).reshape(-1, self.csize, view_size[0], view_size[1])
+        
+        pose_code = v.view(v.shape[0], -1, 1, 1)
+        pose_code = pose_code.repeat(1, 1, view_size[0], view_size[1])
+        x = torch.linspace(-1, 1, view_size[0])
+        y = torch.linspace(-1, 1, view_size[1])
+        x_grid, y_grid = torch.meshgrid(x, y)
+        grid_code = torch.cat((torch.unsqueeze(x_grid, 0), torch.unsqueeze(y_grid, 0)), dim=0).to(device)
+        grid_code = torch.unsqueeze(grid_code, 0).repeat(v.shape[0], 1, 1, 1) 
+        query_view_cell = torch.cat((query_view_cell, pose_code, grid_code), dim=1)
         return query_view_cell

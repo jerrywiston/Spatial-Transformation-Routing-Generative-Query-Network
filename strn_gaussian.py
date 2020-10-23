@@ -7,19 +7,34 @@ from blurPooling import BlurPool2d
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class STRN(nn.Module):
-    def __init__(self, n_view_cells, n_wrd_cells, vsize=7, wcode_size=4, emb_size=32, csize=128):
+    def __init__(self, n_view_cells, n_wrd_cells, vsize=7, wdist_size=4, wcode_size=4, emb_size=32, csize=128):
         super(STRN, self).__init__()
         self.n_view_cells = n_view_cells
         self.n_wrd_cells = n_wrd_cells
+        self.wdist_size = wdist_size
         self.wcode_size = wcode_size
         self.emb_size = emb_size
         self.csize = csize
 
-        # Location Code Extracting for World Cells
-        self.w2c = nn.Sequential(
-            nn.Linear(vsize, 512),
+        # Basic Distribution of World Cells
+        self.sample_wdist(dist="gaussian")
+
+        # Distort the World Distribution
+        self.dist2code = nn.Sequential(
+            nn.Linear(wdist_size, 64),
             nn.ReLU(inplace=True),
-            nn.Linear(512, wcode_size*n_wrd_cells),
+            nn.Linear(64, 64),
+            nn.ReLU(inplace=True),
+            nn.Linear(64, wcode_size)
+        )
+
+        # Transformation from World Space to Camera Space
+        self.w2c = nn.Sequential(
+            nn.Linear(vsize, 128),
+            nn.ReLU(inplace=True),
+            nn.Linear(128, 128),
+            nn.ReLU(inplace=True),
+            nn.Linear(128, wcode_size**2)
         )
         
         # Camera Space Embedding / Frustum Activation / Occlusion
@@ -35,10 +50,24 @@ class STRN(nn.Module):
             nn.Linear(128, emb_size)
         )
 
+    def sample_wdist(self, dist):
+        if dist == "gaussian":
+            self.wdist = torch.randn(self.n_wrd_cells, self.wdist_size).to(device)
+        elif dist == "uniform":
+            self.wdist = torch.rand(self.n_wrd_cells, self.wdist_size).to(device)
+        else:
+            self.wdist = torch.randn(self.n_wrd_cells, self.wdist_size).to(device)
+
     def transform(self, v, view_size=(16,16)):
+        # Get Transform Location Code of World Cells
+        wcode = self.dist2code(self.wdist)
+        wcode_tile = wcode.reshape(1, self.n_wrd_cells, 1, self.wcode_size).repeat(v.shape[0],1,1,1)
+        w2c_mat = self.w2c(v).reshape(-1, 1, self.wcode_size, self.wcode_size).repeat(1,self.n_wrd_cells,1,1)
+        wcode_trans = torch.bmm(wcode_tile.reshape(-1,1,self.wcode_size), w2c_mat.reshape(-1,self.wcode_size,self.wcode_size))
+        wcode_trans = wcode_trans.reshape(-1, self.wcode_size)
+        
         # Camera Space Embedding
-        wcode = self.w2c(v).view(-1, self.wcode_size)
-        h = F.relu(self.fc1(wcode))
+        h = F.relu(self.fc1(wcode_trans))
         h = F.relu(self.fc2(h))
         activation = torch.sigmoid(self.fc_act(h).view(-1, self.n_wrd_cells, 1))
         cs_embedding = self.fc_emb(h).view(-1, self.n_wrd_cells, self.emb_size)

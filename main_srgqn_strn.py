@@ -120,7 +120,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 net = SRGQN(n_wrd_cells=args.w, csize=args.c, ch=64, vsize=7).to(device)
 params = list(net.parameters())
 opt = optim.Adam(params, lr=5e-5, betas=(0.5, 0.999))
-scheduler = optim.lr_scheduler.StepLR(opt, step_size=50, gamma=0.5)
+scheduler = optim.lr_scheduler.StepLR(opt, step_size=165000, gamma=0.5)
 
 ############ Training ############
 max_obs_size = 5

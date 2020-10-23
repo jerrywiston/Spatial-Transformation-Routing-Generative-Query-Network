@@ -91,7 +91,7 @@ class Encoder(nn.Module):
         return out
 
 class EncoderPose(nn.Module):
-    def __init__(self, ch=64, tsize=128, im_size=16):
+    def __init__(self, ch=64, tsize=128, view_size=(16,16)):
         super(EncoderPose, self).__init__()
         self.conv1 = Conv2d(3, ch, 3, stride=2)
         self.conv2 = Conv2d(ch, ch, 3, stride=1)
@@ -103,23 +103,21 @@ class EncoderPose(nn.Module):
         self.conv5 = Conv2d(ch*2, ch*2, 3, stride=1)
         self.bn5 = nn.BatchNorm2d(ch*2)
         self.conv6 = Conv2d(ch*2, tsize, 1, stride=1)
-
-        self.im_size = im_size
-        x = torch.linspace(-1, 1, im_size).to(device)
-        y = torch.linspace(-1, 1, im_size).to(device)
-        self.x_grid, self.y_grid = torch.meshgrid(x, y)
+        self.view_size = view_size
         
     def forward(self, x, v):
-        batch_size = x.shape[0]
-        v = v.view(v.size(0), -1, 1, 1)
-        v = v.repeat(1, 1, self.im_size, self.im_size)
-        x_grid = self.x_grid.reshape(1,1,self.x_grid.shape[0],self.x_grid.shape[1]).repeat(batch_size,1,1,1)
-        y_grid = self.y_grid.reshape(1,1,self.y_grid.shape[0],self.y_grid.shape[1]).repeat(batch_size,1,1,1)
+        pose_code = v.view(v.shape[0], -1, 1, 1)
+        pose_code = pose_code.repeat(1, 1, self.view_size[0], self.view_size[1])
+        xg = torch.linspace(-1, 1, self.view_size[0])
+        yg = torch.linspace(-1, 1, self.view_size[1])
+        x_grid, y_grid = torch.meshgrid(xg, yg)
+        grid_code = torch.cat((torch.unsqueeze(x_grid, 0), torch.unsqueeze(y_grid, 0)), dim=0).to(device)
+        grid_code = torch.unsqueeze(grid_code, 0).repeat(v.shape[0], 1, 1, 1) 
 
         out = F.relu(self.conv1(x), inplace=True)
         out = F.relu(self.bn2(self.conv2(out)), inplace=True) + out
         out = F.relu(self.bn3(self.conv3(out)), inplace=True)
-        out = torch.cat((out, v, x_grid, y_grid), dim=1)
+        out = torch.cat((out, pose_code, grid_code), dim=1)
         out = F.relu(self.bn4(self.conv4(out)), inplace=True)
         out = F.relu(self.bn5(self.conv5(out)), inplace=True) + out
         out = self.conv6(out)
