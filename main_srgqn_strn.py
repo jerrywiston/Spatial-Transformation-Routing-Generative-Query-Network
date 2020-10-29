@@ -166,12 +166,12 @@ for epoch in range(1,total_epoch+1):
         x_query, kl_query = net(x_obs, v_obs, x_query_gt, v_query, n_obs=obs_size)
         lh_query = nn.MSELoss()(x_query, x_query_gt).mean()
         kl_query = torch.mean(torch.sum(kl_query, dim=[1,2,3]))
-        loss_query = lh_query + 0.01*kl_query
+        loss_query = lh_query + 0.001*kl_query
 
         # ------------ Train ------------
         loss_query.backward()
         opt.step()
-        scheduler.step()
+        #scheduler.step()
         
         # ------------ Print Result ------------
         if it % 100 == 0:

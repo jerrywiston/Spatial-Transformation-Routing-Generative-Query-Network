@@ -7,7 +7,7 @@ from blurPooling import BlurPool2d
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class STRN(nn.Module):
-    def __init__(self, n_view_cells, n_wrd_cells, vsize=7, wcode_size=4, emb_size=32, csize=128):
+    def __init__(self, n_view_cells, n_wrd_cells, vsize=7, wcode_size=3, emb_size=32, csize=128):
         super(STRN, self).__init__()
         self.n_view_cells = n_view_cells
         self.n_wrd_cells = n_wrd_cells

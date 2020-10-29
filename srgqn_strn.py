@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import models
-import strn
+import strn#strn_gaussian as strn
 import generator
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
