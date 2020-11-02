@@ -233,11 +233,11 @@ while(True):
             obs_size = 3
             gen_size = 5
             # Train
-            fname = img_path+str(steps%1000).zfill(4)+"k_train.png"
+            fname = img_path+str(steps/1000).zfill(4)+"k_train.png"
             canvas = draw_result(net, train_dataset, obs_size, gen_size)
             cv2.imwrite(fname, canvas)
             # Test
-            fname = img_path+str(steps%1000).zfill(4)+"k_test.png"
+            fname = img_path+str(steps/1000).zfill(4)+"k_test.png"
             canvas = draw_result(net, test_dataset, obs_size, gen_size)
             cv2.imwrite(fname, canvas)
 
