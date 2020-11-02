@@ -8,7 +8,7 @@ Additionally, a representation vector is shared between
 the networks.
 Modified by https://github.com/wohlert/generative-query-network-pytorch/blob/master/gqn/generator.py
 """
-SCALE = 4 # Scale of image generation process
+#SCALE = 4 # Scale of image generation process
 
 import torch
 import torch.nn as nn
@@ -48,12 +48,13 @@ class GeneratorNetwork(nn.Module):
     :param L: number of density refinements
     :param share: whether to share cores across refinements
     """
-    def __init__(self, x_dim, r_dim, z_dim=32, h_dim=128, L=6, share=True):
+    def __init__(self, x_dim, r_dim, z_dim=32, h_dim=128, L=6, scale=4, share=True):
         super(GeneratorNetwork, self).__init__()
         self.L = L
         self.z_dim = z_dim
         self.h_dim = h_dim
         self.share = share
+        self.scale = scale
 
         # Core computational units
         kwargs = dict(kernel_size=5, stride=1)
@@ -74,8 +75,8 @@ class GeneratorNetwork(nn.Module):
         self.observation_density = Conv2d(h_dim, x_dim, kernel_size=1, stride=1, padding=0)
 
         # Up/down-sampling primitives
-        self.upsample   = nn.ConvTranspose2d(h_dim, h_dim, kernel_size=SCALE, stride=SCALE, padding=0, bias=False)
-        self.downsample = Conv2d(x_dim, x_dim, kernel_size=SCALE, stride=SCALE, padding=0, bias=False)
+        self.upsample   = nn.ConvTranspose2d(h_dim, h_dim, kernel_size=self.scale, stride=self.scale, padding=0, bias=False)
+        self.downsample = Conv2d(x_dim, x_dim, kernel_size=self.scale, stride=self.scale, padding=0, bias=False)
 
     def forward(self, x, r):
         """
@@ -93,8 +94,8 @@ class GeneratorNetwork(nn.Module):
         x = self.downsample(x)
 
         # Reset hidden and cell state
-        hidden_i = x.new_zeros((batch_size, self.h_dim, h // SCALE, w // SCALE))
-        hidden_g = x.new_zeros((batch_size, self.h_dim, h // SCALE, w // SCALE))
+        hidden_i = x.new_zeros((batch_size, self.h_dim, h // self.scale, w // self.scale))
+        hidden_g = x.new_zeros((batch_size, self.h_dim, h // self.scale, w // self.scale))
 
         # Canvas for updating
         u = x.new_zeros((batch_size, self.h_dim, h, w))
@@ -140,7 +141,7 @@ class GeneratorNetwork(nn.Module):
         batch_size = r.size(0)
 
         # Reset hidden and cell state for generator
-        hidden_g = r.new_zeros((batch_size, self.h_dim, h // SCALE, w // SCALE))
+        hidden_g = r.new_zeros((batch_size, self.h_dim, h // self.scale, w // self.scale))
 
         u = r.new_zeros((batch_size, self.h_dim, h, w))
 

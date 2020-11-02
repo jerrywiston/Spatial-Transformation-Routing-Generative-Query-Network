@@ -10,7 +10,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
  
-from srgqn_strn import SRGQN
+from srgqn import SRGQN
 from dataset import GqnDatasets
 
 ############ Util Functions ############
