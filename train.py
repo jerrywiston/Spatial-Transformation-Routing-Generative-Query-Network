@@ -228,15 +228,16 @@ while(True):
 
         # ------------ Output Image ------------
         if steps % 1000 == 0:
+            print("------------------------------")
             print("Generate image ...")
             obs_size = 3
             gen_size = 5
             # Train
-            fname = img_path+str(steps).zfill(6)+"_train.png"
+            fname = img_path+str(steps%1000).zfill(4)+"k_train.png"
             canvas = draw_result(net, train_dataset, obs_size, gen_size)
             cv2.imwrite(fname, canvas)
             # Test
-            fname = img_path+str(steps).zfill(6)+"_test.png"
+            fname = img_path+str(steps%1000).zfill(4)+"k_test.png"
             canvas = draw_result(net, test_dataset, obs_size, gen_size)
             cv2.imwrite(fname, canvas)
 
@@ -244,10 +245,9 @@ while(True):
             train_record["loss_query"].append(loss_query_list)
             train_record["lh_query"].append(lh_query_list)
             train_record["kl_query"].append(kl_query_list)
-            if epoch % 5 == 0:
-                print("Dump training record ...")
-                with open(model_path+'train_record.json', 'w') as file:
-                    json.dump(train_record, file)
+            print("Dump training record ...")
+            with open(model_path+'train_record.json', 'w') as file:
+                json.dump(train_record, file)
 
             # ------------ Evaluation Record ------------
             print("Evaluate Training Data ...")
@@ -265,12 +265,13 @@ while(True):
             # ------------ Save Model (One Epoch) ------------
             if steps%100000 == 0:
                 print("Save model ...")
-                torch.save(net.state_dict(), save_path + "srgqn_" + str(epoch).zfill(4) + ".pth")
+                torch.save(net.state_dict(), save_path + "srgqn_" + str(steps).zfill(4) + ".pth")
 
             if lh_test < best_mse:
                 best_mse = lh_test
                 print("Save best model ...")
                 torch.save(net.state_dict(), save_path + "srgqn.pth")
+            print("------------------------------")
 
     print("==============================")
     if steps >= total_steps:

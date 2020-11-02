@@ -145,7 +145,7 @@ class GeneratorNetwork(nn.Module):
 
         u = r.new_zeros((batch_size, self.h_dim, h, w))
 
-        for _ in range(self.L):
+        for l in range(self.L):
             p_mu, p_log_std = torch.chunk(self.prior_density(hidden_g), 2, dim=1)
             prior_distribution = Normal(p_mu, F.softplus(p_log_std))
 
@@ -153,7 +153,8 @@ class GeneratorNetwork(nn.Module):
             z = prior_distribution.sample()
 
             # Calculate u
-            hidden_g = self.generator_core(torch.cat([z, r], dim=1), hidden_g)
+            generator = self.generator_core if self.share else self.generator_core[l]
+            hidden_g = generator(torch.cat([z, r], dim=1), hidden_g)
             u = self.upsample(hidden_g) + u
 
         x_mu = self.observation_density(u)
