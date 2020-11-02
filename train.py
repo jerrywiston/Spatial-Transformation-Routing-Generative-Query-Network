@@ -13,7 +13,6 @@ from torch.utils.data import DataLoader
  
 from srgqn import SRGQN
 from dataset import GqnDatasets
-import configparser
 
 ############ Util Functions ############
 def draw_result(net, dataset, obs_size=3, gen_size=5):
@@ -83,7 +82,7 @@ def eval(net, dataset, obs_size=4, max_batch=600):
     print("\nMSE =", lh_mean, ", KL =", kl_mean)
     return float(lh_mean), float(kl_mean), lh_record, kl_record
 
-def getConfig(config):
+def get_config(config):
     # Fill the parameters
     args = lambda: None
     # Model Parameters
@@ -94,7 +93,6 @@ def getConfig(config):
     args.draw_layers = config.getint('model', 'draw_layers')
     args.share_core = config.getboolean('model', 'share_core')
     # Experimental Parameters
-    args.exp_name = config.get('exp', 'exp_name')
     args.data_path = config.get('exp', 'data_path')
     args.frac_train = config.getfloat('exp', 'frac_train')
     args.frac_test = config.getfloat('exp', 'frac_test')
@@ -106,20 +104,26 @@ def getConfig(config):
 
 ############ Parameter Parsing ############
 parser = argparse.ArgumentParser()
-parser.add_argument('--config', nargs='?', type=str, default="config.conf" ,help='Config filename.')
+parser.add_argument('--exp_name', nargs='?', type=str, default="rrc" ,help='Experiment name.')
+parser.add_argument('--config', nargs='?', type=str, default="./config.conf" ,help='Config filename.')
 config_file = parser.parse_args().config
 config = configparser.ConfigParser()
 config.read(config_file)
-args = getConfig(config)
+args = get_config(config)
+args.exp_name = parser.parse_args().exp_name
 
 # Print 
 print("Configure File: %s"%(config_file))
-print("Experiment Path: %s"%(args.exp_name))
+print("Experiment Name: %s"%(args.exp_name))
 print("Number of world cells: %d"%(args.w))
 print("Number of concepts: %d"%(args.c))
 print("Number of channels: %d"%(args.ch))
 print("Downsampling size of view cell: %d"%(args.down_size))
 print("Number of draw layers: %d"%(args.draw_layers))
+if args.share_core:
+    print("Share core: True")
+else:
+    print("Share core: False")
 
 ############ Dataset ############
 path = args.data_path
@@ -233,11 +237,11 @@ while(True):
             obs_size = 3
             gen_size = 5
             # Train
-            fname = img_path+str(steps/1000).zfill(4)+"k_train.png"
+            fname = img_path+str(int(steps/1000)).zfill(4)+"k_train.png"
             canvas = draw_result(net, train_dataset, obs_size, gen_size)
             cv2.imwrite(fname, canvas)
             # Test
-            fname = img_path+str(steps/1000).zfill(4)+"k_test.png"
+            fname = img_path+str(int(steps/1000)).zfill(4)+"k_test.png"
             canvas = draw_result(net, test_dataset, obs_size, gen_size)
             cv2.imwrite(fname, canvas)
 
