@@ -87,6 +87,7 @@ def get_config(config):
     args = lambda: None
     # Model Parameters
     args.w = config.getint('model', 'w')
+    args.v = (config.getint('model', 'v_h'), config.getint('model', 'v_w'))
     args.c = config.getint('model', 'c')
     args.ch = config.getint('model', 'ch')
     args.down_size = config.getint('model', 'down_size')
@@ -116,6 +117,7 @@ args.exp_name = parser.parse_args().exp_name
 print("Configure File: %s"%(config_file))
 print("Experiment Name: %s"%(args.exp_name))
 print("Number of world cells: %d"%(args.w))
+print("Size of view cells: " + str(args.v))
 print("Number of concepts: %d"%(args.c))
 print("Number of channels: %d"%(args.ch))
 print("Downsampling size of view cell: %d"%(args.down_size))
@@ -155,7 +157,7 @@ with open(model_path + 'config.conf', 'w') as cfile:
 
 ############ Networks ############
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-net = SRGQN(n_wrd_cells=args.w, csize=args.c, ch=args.ch, vsize=7, \
+net = SRGQN(n_wrd_cells=args.w, view_size=args.v, csize=args.c, ch=args.ch, vsize=7, \
     draw_layers=args.draw_layers, down_size=args.down_size, share_core=args.share_core).to(device)
 params = list(net.parameters())
 opt = optim.Adam(params, lr=5e-5, betas=(0.5, 0.999))

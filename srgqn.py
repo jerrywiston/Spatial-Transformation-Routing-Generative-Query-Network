@@ -19,19 +19,22 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Deterministic
 class SRGQN(nn.Module):
-    def __init__(self, n_wrd_cells=2000, csize=128, ch=64, vsize=7, draw_layers=6, down_size=4, share_core=False):
+    def __init__(self, n_wrd_cells=2000, view_size=(16,16), csize=128, ch=64, vsize=7, draw_layers=6, down_size=4, share_core=False):
         super(SRGQN, self).__init__()
         self.n_wrd_cells = n_wrd_cells
+        self.view_size = view_size
         self.csize = csize
         self.vsize = vsize
         self.ch = ch
         self.draw_layers = draw_layers
 
-        self.encoder = encoder.EncoderNetwork(ch, csize).to(device)
-        self.strn = strn.STRN(n_wrd_cells, vsize=vsize, csize=csize).to(device)
+        self.encoder = encoder.EncoderNetwork(ch, csize, down_size).to(device)
+        self.strn = strn.STRN(n_wrd_cells, view_size=view_size, vsize=vsize, csize=csize).to(device)
         self.generator = generator.GeneratorNetwork(x_dim=3, r_dim=csize, L=draw_layers, scale=down_size, share=share_core).to(device)
 
-    def step_observation_encode(self, x, v, view_size=(16,16)):
+    def step_observation_encode(self, x, v, view_size=None):
+        if view_size is None:
+            view_size = self.view_size
         view_cell = self.encoder(x).reshape(-1, self.csize, view_size[0]*view_size[1])
         wrd_cell = self.strn(view_cell, v, view_size=view_size)
         return wrd_cell
@@ -51,7 +54,9 @@ class SRGQN(nn.Module):
         x_query = self.generator.sample((64,64), view_cell_query)
         return x_query
     
-    def visualize_routing(self, view_cell, v, vq, steps=None, view_size=(16,16)):
+    def visualize_routing(self, view_cell, v, vq, steps=None, view_size=None):
+        if view_size is None:
+            view_size = self.view_size
         wrd_cell = self.strn(view_cell.reshape(-1, self.csize, view_size[0]*view_size[1]), v, view_size=view_size)
         scene_cell = wrd_cell
         view_cell_query = self.strn.query(scene_cell, vq, steps=steps, view_size=view_size, occlusion=False)

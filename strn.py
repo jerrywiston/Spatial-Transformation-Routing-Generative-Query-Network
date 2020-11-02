@@ -6,9 +6,10 @@ from padding_same_conv import Conv2d
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class STRN(nn.Module):
-    def __init__(self, n_wrd_cells, vsize=7, wcode_size=3, emb_size=32, csize=128):
+    def __init__(self, n_wrd_cells, view_size=(16,16), vsize=7, wcode_size=3, emb_size=32, csize=128):
         super(STRN, self).__init__()
         self.n_wrd_cells = n_wrd_cells
+        self.view_size = view_size
         self.wcode_size = wcode_size
         self.emb_size = emb_size
         self.csize = csize
@@ -33,7 +34,9 @@ class STRN(nn.Module):
             nn.Linear(128, emb_size)
         )
 
-    def transform(self, v, view_size=(16,16)):
+    def transform(self, v, view_size=None):
+        if view_size is None:
+            view_size = self.view_size
         # Camera Space Embedding
         wcode = self.w2c(v).view(-1, self.wcode_size)
         h = F.relu(self.fc1(wcode))
@@ -53,14 +56,18 @@ class STRN(nn.Module):
         relation = torch.bmm(cs_embedding, vs_embedding.permute(0,2,1)) #(-1, wrd_cell, view_cell)
         return relation, activation
 
-    def forward(self, view_cell, v, view_size=(16,16)):
+    def forward(self, view_cell, v, view_size=None):
+        if view_size is None:
+            view_size = self.view_size
         relation, activation = self.transform(v, view_size=view_size)
         distribution = torch.softmax(relation, 2)
         route = distribution * activation   # (-1, n_wrd_cells, n_view_cells)
         wrd_cell = torch.bmm(view_cell, route.permute(0,2,1))
         return wrd_cell # (-1, csize, n_wrd_cells)
     
-    def query(self, wrd_cell, v, view_size=(16,16), steps=None, occlusion=True):
+    def query(self, wrd_cell, v, view_size=None, steps=None, occlusion=True):
+        if view_size is None:
+            view_size = self.view_size
         relation, activation = self.transform(v, view_size=view_size)
         distribution = torch.softmax(relation, 1)
         route = distribution * activation   # (-1, n_wrd_cells, n_view_cells)
