@@ -79,3 +79,11 @@ class SRGQN(nn.Module):
         # Query Image
         x_query = self.step_query_view_sample(scene_cell, vq, steps=steps)
         return x_query
+
+    def reconstruct(self, x):
+        view_cell = self.encoder(x)
+        view_cell = torch.sigmoid(view_cell)
+        random_mask = torch.rand((x.size(0),1,self.view_size[0],self.view_size[1])).to(device)
+        view_cell_mask = random_mask * view_cell
+        x_rec, kl = self.generator(x, view_cell_mask)
+        return x_rec, kl
