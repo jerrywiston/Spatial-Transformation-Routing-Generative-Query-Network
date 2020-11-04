@@ -273,11 +273,11 @@ while(True):
                 print("Save model ...")
                 torch.save(net.state_dict(), save_path + "srgqn_" + str(steps).zfill(4) + ".pth")
 
-            print("Best Test MSE:", best_mse)
             if lh_test < best_mse:
                 best_mse = lh_test
                 print("Save best model ...")
                 torch.save(net.state_dict(), save_path + "srgqn.pth")
+            print("Best Test MSE:", best_mse)
             print("------------------------------")
 
     print("==============================")
