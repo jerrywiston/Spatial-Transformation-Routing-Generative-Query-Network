@@ -26,6 +26,7 @@ class SRGQN(nn.Module):
         self.csize = csize
         self.vsize = vsize
         self.ch = ch
+        self.down_size = down_size
         self.draw_layers = draw_layers
 
         self.encoder = encoder.EncoderNetwork2(ch, csize, down_size).to(device)
@@ -51,7 +52,8 @@ class SRGQN(nn.Module):
 
     def step_query_view_sample(self, scene_cell, vq, steps=None):
         view_cell_query = self.strn.query(scene_cell, vq, steps=steps)
-        x_query = self.generator.sample((64,64), view_cell_query)
+        sample_size = (self.view_size[0]*self.down_size, self.view_size[1]*self.down_size)
+        x_query = self.generator.sample(sample_size, view_cell_query)
         return x_query
     
     def visualize_routing(self, view_cell, v, vq, steps=None, view_size=None):

@@ -12,7 +12,7 @@ if not os.path.exists(args.download_path):
 print("Done")
 
 print("Download data.")
-command_str = "gsutil -m cp -R -n gs://gqn-dataset/" + args.dataset + " " + args.download_path
+command_str = "gsutil -m cp -R -n gs://egqn-datasets/" + args.dataset + " " + args.download_path
 print(command_str)
 os.system(command_str)
 print("Done")

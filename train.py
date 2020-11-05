@@ -32,26 +32,26 @@ def draw_result(net, dataset, obs_size=3, gen_size=5, img_size=64):
         canvas[:img_size*gen_size,:img_size*obs_size,:] = x_obs_draw
         # Draw Query GT
         x_gt_draw = (image[:gen_size,obs_size].detach()*255).permute(0,2,3,1).cpu().numpy().astype(np.uint8)
-        x_gt_draw = cv2.cvtColor(x_gt_draw.reshape(img_size*gen_size,64,3), cv2.COLOR_BGR2RGB)
+        x_gt_draw = cv2.cvtColor(x_gt_draw.reshape(img_size*gen_size,img_size,3), cv2.COLOR_BGR2RGB)
         canvas[:,img_size*(obs_size):img_size*(obs_size+1),:] = x_gt_draw
         # Draw Query Gen
         x_query_draw = (x_query[:gen_size].detach()*255).permute(0,2,3,1).cpu().numpy().astype(np.uint8)
         x_query_draw = cv2.cvtColor(x_query_draw.reshape(img_size*gen_size,img_size,3), cv2.COLOR_BGR2RGB)
-        canvas[:,64*(obs_size+1):,:] = x_query_draw
+        canvas[:,img_size*(obs_size+1):,:] = x_query_draw
         # Draw Grid
         cv2.line(canvas, (0,0),(0,img_size*gen_size),(0,0,0), 2)
         cv2.line(canvas, (img_size*(obs_size+2)-1,0),(img_size*(obs_size+2)-1,img_size*gen_size),(0,0,0), 2)
         cv2.line(canvas, (img_size*obs_size,0),(img_size*obs_size,img_size*gen_size),(255,0,0), 2)
         cv2.line(canvas, (img_size*(obs_size+1),0),(img_size*(obs_size+1),img_size*gen_size),(0,0,255), 2)
         for i in range(1,3):
-            canvas[:,64*i:64*i+1,:] = 0
+            canvas[:,img_size*i:img_size*i+1,:] = 0
         for i in range(gen_size):
-            canvas[64*i:64*i+1,:,:] = 0
-            canvas[64*(i+1)-1:64*(i+1),:,:] = 0
+            canvas[img_size*i:img_size*i+1,:,:] = 0
+            canvas[img_size*(i+1)-1:img_size*(i+1),:,:] = 0
         break
     return canvas
 
-def eval(net, dataset, obs_size=3, max_batch=600):
+def eval(net, dataset, obs_size=3, max_batch=600, img_size=64):
     data_loader = DataLoader(dataset, batch_size=1, shuffle=False)
     lh_record = []
     kl_record = []
@@ -61,7 +61,7 @@ def eval(net, dataset, obs_size=3, max_batch=600):
         image = batch[0].squeeze(0)
         pose = batch[1].squeeze(0)
         # Get Data
-        x_obs = image[:,:obs_size].reshape(-1,3,64,64).to(device)
+        x_obs = image[:,:obs_size].reshape(-1,3,img_size,img_size).to(device)
         v_obs = pose[:,:obs_size].reshape(-1,7).to(device)
         v_query = pose[:,obs_size].to(device)
         x_query_gt = image[:,obs_size].to(device)
@@ -112,7 +112,7 @@ config = configparser.ConfigParser()
 config.read(config_file)
 args = get_config(config)
 args.exp_name = parser.parse_args().exp_name
-args.img_size = (args.view_size[0]*args.down_size, args.view_size[1]*args.down_size)
+args.img_size = (args.v[0]*args.down_size, args.v[1]*args.down_size)
 
 # Print 
 print("Configure File: %s"%(config_file))

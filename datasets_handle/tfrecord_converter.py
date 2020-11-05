@@ -25,7 +25,8 @@ tf.logging.set_verbosity(tf.logging.ERROR)
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
 #POSE_DIM, IMG_DIM, SEQ_DIM = 5, 64, 15
-POSE_DIM, IMG_DIM, SEQ_DIM = 5, 64, 10
+#POSE_DIM, IMG_DIM, SEQ_DIM = 5, 64, 10
+POSE_DIM, IMG_DIM, SEQ_DIM = 5, 128, 4
 
 def chunk(iterable, size=10):
     """
