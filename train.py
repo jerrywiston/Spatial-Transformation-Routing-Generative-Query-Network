@@ -15,34 +15,34 @@ from srgqn import SRGQN
 from dataset import GqnDatasets
 
 ############ Util Functions ############
-def draw_result(net, dataset, obs_size=3, gen_size=5):
+def draw_result(net, dataset, obs_size=3, gen_size=5, img_size=64)):
     data_loader = DataLoader(dataset, batch_size=1, shuffle=True)
     for it, batch in enumerate(data_loader):
         image = batch[0].squeeze(0)
         pose = batch[1].squeeze(0)
         # Get Data
-        x_obs = image[:,:obs_size].reshape(-1,3,64,64).to(device)
+        x_obs = image[:,:obs_size].reshape(-1,3,img_size,img_size).to(device)
         v_obs = pose[:,:obs_size].reshape(-1,7).to(device)
-        v_query = pose[:,obs_size+1].to(device)
+        v_query = pose[:,obs_size].to(device)
         x_query = net.sample(x_obs, v_obs, v_query, n_obs=obs_size)
         # Draw Observation
-        canvas = np.zeros((64*gen_size,64*(obs_size+2),3), dtype=np.uint8)
+        canvas = np.zeros((img_size*gen_size,img_size*(obs_size+2),3), dtype=np.uint8)
         x_obs_draw = (image[:gen_size,:obs_size].detach()*255).permute(0,3,1,4,2).cpu().numpy().astype(np.uint8)
-        x_obs_draw = cv2.cvtColor(x_obs_draw.reshape(64*gen_size,64*obs_size,3), cv2.COLOR_BGR2RGB)
-        canvas[:64*gen_size,:64*obs_size,:] = x_obs_draw
+        x_obs_draw = cv2.cvtColor(x_obs_draw.reshape(img_size*gen_size,img_size*obs_size,3), cv2.COLOR_BGR2RGB)
+        canvas[:img_size*gen_size,:img_size*obs_size,:] = x_obs_draw
         # Draw Query GT
-        x_gt_draw = (image[:gen_size,obs_size+1].detach()*255).permute(0,2,3,1).cpu().numpy().astype(np.uint8)
-        x_gt_draw = cv2.cvtColor(x_gt_draw.reshape(64*gen_size,64,3), cv2.COLOR_BGR2RGB)
-        canvas[:,64*(obs_size):64*(obs_size+1),:] = x_gt_draw
+        x_gt_draw = (image[:gen_size,obs_size].detach()*255).permute(0,2,3,1).cpu().numpy().astype(np.uint8)
+        x_gt_draw = cv2.cvtColor(x_gt_draw.reshape(img_size*gen_size,64,3), cv2.COLOR_BGR2RGB)
+        canvas[:,img_size*(obs_size):img_size*(obs_size+1),:] = x_gt_draw
         # Draw Query Gen
         x_query_draw = (x_query[:gen_size].detach()*255).permute(0,2,3,1).cpu().numpy().astype(np.uint8)
-        x_query_draw = cv2.cvtColor(x_query_draw.reshape(64*gen_size,64,3), cv2.COLOR_BGR2RGB)
+        x_query_draw = cv2.cvtColor(x_query_draw.reshape(img_size*gen_size,img_size,3), cv2.COLOR_BGR2RGB)
         canvas[:,64*(obs_size+1):,:] = x_query_draw
         # Draw Grid
-        cv2.line(canvas, (0,0),(0,64*gen_size),(0,0,0), 2)
-        cv2.line(canvas, (64*(obs_size+2)-1,0),(64*(obs_size+2)-1,64*gen_size),(0,0,0), 2)
-        cv2.line(canvas, (64*obs_size,0),(64*obs_size,64*gen_size),(255,0,0), 2)
-        cv2.line(canvas, (64*(obs_size+1),0),(64*(obs_size+1),64*gen_size),(0,0,255), 2)
+        cv2.line(canvas, (0,0),(0,img_size*gen_size),(0,0,0), 2)
+        cv2.line(canvas, (img_size*(obs_size+2)-1,0),(img_size*(obs_size+2)-1,img_size*gen_size),(0,0,0), 2)
+        cv2.line(canvas, (img_size*obs_size,0),(img_size*obs_size,img_size*gen_size),(255,0,0), 2)
+        cv2.line(canvas, (img_size*(obs_size+1),0),(img_size*(obs_size+1),img_size*gen_size),(0,0,255), 2)
         for i in range(1,3):
             canvas[:,64*i:64*i+1,:] = 0
         for i in range(gen_size):
@@ -51,7 +51,7 @@ def draw_result(net, dataset, obs_size=3, gen_size=5):
         break
     return canvas
 
-def eval(net, dataset, obs_size=4, max_batch=600):
+def eval(net, dataset, obs_size=3, max_batch=600):
     data_loader = DataLoader(dataset, batch_size=1, shuffle=False)
     lh_record = []
     kl_record = []
@@ -63,8 +63,8 @@ def eval(net, dataset, obs_size=4, max_batch=600):
         # Get Data
         x_obs = image[:,:obs_size].reshape(-1,3,64,64).to(device)
         v_obs = pose[:,:obs_size].reshape(-1,7).to(device)
-        v_query = pose[:,obs_size+1].to(device)
-        x_query_gt = image[:,obs_size+1].to(device)
+        v_query = pose[:,obs_size].to(device)
+        x_query_gt = image[:,obs_size].to(device)
         with torch.no_grad():
             x_query_sample = net.sample(x_obs, v_obs, v_query, n_obs=obs_size)
             x_query, kl_query = net(x_obs, v_obs, x_query_gt, v_query, n_obs=obs_size)
