@@ -112,6 +112,7 @@ config = configparser.ConfigParser()
 config.read(config_file)
 args = get_config(config)
 args.exp_name = parser.parse_args().exp_name
+args.img_size = (args.view_size[0]*args.down_size, args.view_size[1]*args.down_size)
 
 # Print 
 print("Configure File: %s"%(config_file))
@@ -240,11 +241,11 @@ while(True):
             gen_size = 5
             # Train
             fname = img_path+str(int(steps/1000)).zfill(4)+"k_train.png"
-            canvas = draw_result(net, train_dataset, obs_size, gen_size)
+            canvas = draw_result(net, train_dataset, obs_size, gen_size, args.img_size[0])
             cv2.imwrite(fname, canvas)
             # Test
             fname = img_path+str(int(steps/1000)).zfill(4)+"k_test.png"
-            canvas = draw_result(net, test_dataset, obs_size, gen_size)
+            canvas = draw_result(net, test_dataset, obs_size, gen_size, args.img_size[0])
             cv2.imwrite(fname, canvas)
 
             # ------------ Training Record ------------
