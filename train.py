@@ -15,43 +15,43 @@ from srgqn import SRGQN
 from dataset import GqnDatasets
 
 ############ Util Functions ############
-def draw_result(net, dataset, obs_size=3, gen_size=5, img_size=64):
+def draw_result(net, dataset, obs_size=3, gen_size=5, img_size=(64,64)):
     data_loader = DataLoader(dataset, batch_size=1, shuffle=True)
     for it, batch in enumerate(data_loader):
         image = batch[0].squeeze(0)
         pose = batch[1].squeeze(0)
         # Get Data
-        x_obs = image[:,:obs_size].reshape(-1,3,img_size,img_size).to(device)
+        x_obs = image[:,:obs_size].reshape(-1,3,img_size[0],img_size[1]).to(device)
         v_obs = pose[:,:obs_size].reshape(-1,7).to(device)
         v_query = pose[:,obs_size].to(device)
         x_query = net.sample(x_obs, v_obs, v_query, n_obs=obs_size)
         # Draw Observation
-        canvas = np.zeros((img_size*gen_size,img_size*(obs_size+2),3), dtype=np.uint8)
+        canvas = np.zeros((img_size[0]*gen_size,img_size[1]*(obs_size+2),3), dtype=np.uint8)
         x_obs_draw = (image[:gen_size,:obs_size].detach()*255).permute(0,3,1,4,2).cpu().numpy().astype(np.uint8)
-        x_obs_draw = cv2.cvtColor(x_obs_draw.reshape(img_size*gen_size,img_size*obs_size,3), cv2.COLOR_BGR2RGB)
-        canvas[:img_size*gen_size,:img_size*obs_size,:] = x_obs_draw
+        x_obs_draw = cv2.cvtColor(x_obs_draw.reshape(img_size[0]*gen_size,img_size[1]*obs_size,3), cv2.COLOR_BGR2RGB)
+        canvas[:img_size[0]*gen_size,:img_size[1]*obs_size,:] = x_obs_draw
         # Draw Query GT
         x_gt_draw = (image[:gen_size,obs_size].detach()*255).permute(0,2,3,1).cpu().numpy().astype(np.uint8)
-        x_gt_draw = cv2.cvtColor(x_gt_draw.reshape(img_size*gen_size,img_size,3), cv2.COLOR_BGR2RGB)
-        canvas[:,img_size*(obs_size):img_size*(obs_size+1),:] = x_gt_draw
+        x_gt_draw = cv2.cvtColor(x_gt_draw.reshape(img_size[0]*gen_size,img_size[1],3), cv2.COLOR_BGR2RGB)
+        canvas[:,img_size[1]*(obs_size):img_size[1]*(obs_size+1),:] = x_gt_draw
         # Draw Query Gen
         x_query_draw = (x_query[:gen_size].detach()*255).permute(0,2,3,1).cpu().numpy().astype(np.uint8)
-        x_query_draw = cv2.cvtColor(x_query_draw.reshape(img_size*gen_size,img_size,3), cv2.COLOR_BGR2RGB)
-        canvas[:,img_size*(obs_size+1):,:] = x_query_draw
+        x_query_draw = cv2.cvtColor(x_query_draw.reshape(img_size[0]*gen_size,img_size[1],3), cv2.COLOR_BGR2RGB)
+        canvas[:,img_size[1]*(obs_size+1):,:] = x_query_draw
         # Draw Grid
         cv2.line(canvas, (0,0),(0,img_size*gen_size),(0,0,0), 2)
         cv2.line(canvas, (img_size*(obs_size+2)-1,0),(img_size*(obs_size+2)-1,img_size*gen_size),(0,0,0), 2)
         cv2.line(canvas, (img_size*obs_size,0),(img_size*obs_size,img_size*gen_size),(255,0,0), 2)
         cv2.line(canvas, (img_size*(obs_size+1),0),(img_size*(obs_size+1),img_size*gen_size),(0,0,255), 2)
         for i in range(1,3):
-            canvas[:,img_size*i:img_size*i+1,:] = 0
+            canvas[:,img_size[1]*i:img_size[1]*i+1,:] = 0
         for i in range(gen_size):
-            canvas[img_size*i:img_size*i+1,:,:] = 0
-            canvas[img_size*(i+1)-1:img_size*(i+1),:,:] = 0
+            canvas[img_size[0]*i:img_size[0]*i+1,:,:] = 0
+            canvas[img_size[0]*(i+1)-1:img_size[0]*(i+1),:,:] = 0
         break
     return canvas
 
-def eval(net, dataset, obs_size=3, max_batch=600, img_size=64):
+def eval(net, dataset, obs_size=3, max_batch=600, img_size=(64,64)):
     data_loader = DataLoader(dataset, batch_size=1, shuffle=False)
     lh_record = []
     kl_record = []
@@ -61,7 +61,7 @@ def eval(net, dataset, obs_size=3, max_batch=600, img_size=64):
         image = batch[0].squeeze(0)
         pose = batch[1].squeeze(0)
         # Get Data
-        x_obs = image[:,:obs_size].reshape(-1,3,img_size,img_size).to(device)
+        x_obs = image[:,:obs_size].reshape(-1,3,img_size[0],img_size[1]).to(device)
         v_obs = pose[:,:obs_size].reshape(-1,7).to(device)
         v_query = pose[:,obs_size].to(device)
         x_query_gt = image[:,obs_size].to(device)
@@ -241,11 +241,11 @@ while(True):
             gen_size = 5
             # Train
             fname = img_path+str(int(steps/1000)).zfill(4)+"k_train.png"
-            canvas = draw_result(net, train_dataset, obs_size, gen_size, args.img_size[0])
+            canvas = draw_result(net, train_dataset, obs_size, gen_size, args.img_size)
             cv2.imwrite(fname, canvas)
             # Test
             fname = img_path+str(int(steps/1000)).zfill(4)+"k_test.png"
-            canvas = draw_result(net, test_dataset, obs_size, gen_size, args.img_size[0])
+            canvas = draw_result(net, test_dataset, obs_size, gen_size, args.img_size)
             cv2.imwrite(fname, canvas)
 
             # ------------ Training Record ------------
