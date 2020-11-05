@@ -15,7 +15,7 @@ from srgqn import SRGQN
 from dataset import GqnDatasets
 
 ############ Util Functions ############
-def draw_result(net, dataset, obs_size=3, gen_size=5, img_size=64)):
+def draw_result(net, dataset, obs_size=3, gen_size=5, img_size=64):
     data_loader = DataLoader(dataset, batch_size=1, shuffle=True)
     for it, batch in enumerate(data_loader):
         image = batch[0].squeeze(0)
