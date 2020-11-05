@@ -15,7 +15,7 @@ from srgqn import SRGQN
 from dataset import GqnDatasets
 
 ############ Util Functions ############
-def draw_result(net, dataset, obs_size=3, gen_size=5, img_size=(64,64)):
+def draw_result(net, dataset, obs_size=3, gen_size=5, img_size=(64,64), convert_bgr=True):
     data_loader = DataLoader(dataset, batch_size=1, shuffle=True)
     for it, batch in enumerate(data_loader):
         image = batch[0].squeeze(0)
@@ -32,11 +32,15 @@ def draw_result(net, dataset, obs_size=3, gen_size=5, img_size=(64,64)):
         canvas[:img_size[0]*gen_size,:img_size[1]*obs_size,:] = x_obs_draw
         # Draw Query GT
         x_gt_draw = (image[:gen_size,obs_size].detach()*255).permute(0,2,3,1).cpu().numpy().astype(np.uint8)
-        x_gt_draw = cv2.cvtColor(x_gt_draw.reshape(img_size[0]*gen_size,img_size[1],3), cv2.COLOR_BGR2RGB)
+        x_gt_draw = x_gt_draw.reshape(img_size[0]*gen_size,img_size[1],3)
+        if convert_bgr:
+            x_gt_draw = cv2.cvtColor(x_gt_draw, cv2.COLOR_BGR2RGB)
         canvas[:,img_size[1]*(obs_size):img_size[1]*(obs_size+1),:] = x_gt_draw
         # Draw Query Gen
         x_query_draw = (x_query[:gen_size].detach()*255).permute(0,2,3,1).cpu().numpy().astype(np.uint8)
-        x_query_draw = cv2.cvtColor(x_query_draw.reshape(img_size[0]*gen_size,img_size[1],3), cv2.COLOR_BGR2RGB)
+        x_query_draw = x_query_draw.reshape(img_size[0]*gen_size,img_size[1],3)
+        if convert_bgr:
+            x_query_draw = cv2.cvtColor(x_query_draw, cv2.COLOR_BGR2RGB)
         canvas[:,img_size[1]*(obs_size+1):,:] = x_query_draw
         # Draw Grid
         cv2.line(canvas, (0,0),(0,img_size*gen_size),(0,0,0), 2)
@@ -101,6 +105,10 @@ def get_config(config):
     args.total_steps = config.getint('exp', 'total_steps')
     args.total_epochs = config.getint('exp', 'total_epochs')
     args.kl_scale = config.getfloat('exp', 'kl_scale')
+    if config.has_option('exp', 'convert_bgr'):
+        args.convert_rgb = config.getboolean('exp', 'convert_bgr')
+    else:
+        args.convert_rgb = True
     return args
 
 ############ Parameter Parsing ############
@@ -258,9 +266,9 @@ while(True):
 
             # ------------ Evaluation Record ------------
             print("Evaluate Training Data ...")
-            lh_train, kl_train, _, _ = eval(net, train_dataset, obs_size=3)
+            lh_train, kl_train, _, _ = eval(net, train_dataset, obs_size=3, img_size=args.img_size)
             print("Evaluate Testing Data ...")
-            lh_test, kl_test, _, _ = eval(net, test_dataset, obs_size=3)
+            lh_test, kl_test, _, _ = eval(net, test_dataset, obs_size=3, img_size=args.img_size)
             eval_record["mse_train"].append(lh_train)
             eval_record["kl_train"].append(kl_train)
             eval_record["mse_test"].append(lh_test)
