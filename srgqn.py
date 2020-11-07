@@ -61,7 +61,7 @@ class SRGQN(nn.Module):
             view_size = self.view_size
         wrd_cell = self.strn(view_cell.reshape(-1, self.csize, view_size[0]*view_size[1]), v, view_size=view_size)
         scene_cell = wrd_cell
-        view_cell_query = self.strn.query(scene_cell, vq, steps=steps, view_size=view_size, occlusion=False)
+        view_cell_query = self.strn.query(scene_cell, vq, steps=steps, view_size=view_size)
         return view_cell_query
 
     def forward(self, x, v, xq, vq, n_obs=3, steps=None):
