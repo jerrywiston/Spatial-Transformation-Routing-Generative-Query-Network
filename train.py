@@ -43,10 +43,10 @@ def draw_result(net, dataset, obs_size=3, gen_size=5, img_size=(64,64), convert_
             x_query_draw = cv2.cvtColor(x_query_draw, cv2.COLOR_BGR2RGB)
         canvas[:,img_size[1]*(obs_size+1):,:] = x_query_draw
         # Draw Grid
-        cv2.line(canvas, (0,0),(0,img_size*gen_size),(0,0,0), 2)
-        cv2.line(canvas, (img_size*(obs_size+2)-1,0),(img_size*(obs_size+2)-1,img_size*gen_size),(0,0,0), 2)
-        cv2.line(canvas, (img_size*obs_size,0),(img_size*obs_size,img_size*gen_size),(255,0,0), 2)
-        cv2.line(canvas, (img_size*(obs_size+1),0),(img_size*(obs_size+1),img_size*gen_size),(0,0,255), 2)
+        cv2.line(canvas, (0,0),(0,img_size[1]*gen_size),(0,0,0), 2)
+        cv2.line(canvas, (img_size[0]*(obs_size+2)-1,0),(img_size[1]*(obs_size+2)-1,img_size[1]*gen_size),(0,0,0), 2)
+        cv2.line(canvas, (img_size[0]*obs_size,0),(img_size[1]*obs_size,img_size[1]*gen_size),(255,0,0), 2)
+        cv2.line(canvas, (img_size[0]*(obs_size+1),0),(img_size[1]*(obs_size+1),img_size[1]*gen_size),(0,0,255), 2)
         for i in range(1,3):
             canvas[:,img_size[1]*i:img_size[1]*i+1,:] = 0
         for i in range(gen_size):
@@ -55,7 +55,7 @@ def draw_result(net, dataset, obs_size=3, gen_size=5, img_size=(64,64), convert_
         break
     return canvas
 
-def eval(net, dataset, obs_size=3, max_batch=600, img_size=(64,64)):
+def eval(net, dataset, obs_size=3, max_batch=400, img_size=(64,64)):
     data_loader = DataLoader(dataset, batch_size=1, shuffle=False)
     lh_record = []
     kl_record = []
@@ -201,7 +201,7 @@ while(True):
         obs_idx = np.random.choice(image.shape[1], obs_size)
         query_idx = np.random.randint(0, image.shape[1]-1)
         
-        x_obs = image[:,obs_idx].reshape(-1,3,64,64).to(device)
+        x_obs = image[:,obs_idx].reshape(-1,3,args.img_size[0],args.img_size[1]).to(device)
         v_obs = pose[:,obs_idx].reshape(-1,7).to(device)
         x_query_gt = image[:,query_idx].to(device)
         v_query = pose[:,query_idx].to(device)
