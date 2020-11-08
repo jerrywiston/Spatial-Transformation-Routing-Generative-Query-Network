@@ -10,13 +10,13 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
-
+ 
 from srgqn import SRGQN
 from dataset import GqnDatasets
 
 ############ Util Functions ############
 def draw_result(net, dataset, obs_size=3, gen_size=5, img_size=(64,64), convert_bgr=True):
-    data_loader = DataLoader(dataset, batch_size=1, shuffle=False)
+    data_loader = DataLoader(dataset, batch_size=1, shuffle=True)
     for it, batch in enumerate(data_loader):
         image = batch[0].squeeze(0)
         pose = batch[1].squeeze(0)
@@ -72,7 +72,8 @@ def eval(net, dataset, obs_size=3, max_batch=400, img_size=(64,64)):
         with torch.no_grad():
             x_query_sample = net.sample(x_obs, v_obs, v_query, n_obs=obs_size)
             x_query, kl_query = net(x_obs, v_obs, x_query_gt, v_query, n_obs=obs_size)
-            kl_query = torch.mean(torch.sum(kl_query, dim=[1,2,3])).cpu().numpy()
+            #kl_query = torch.mean(torch.sum(kl_query, dim=[1,2,3])).cpu().numpy()
+            kl_query = kl_query.cpu().numpy()
             mse_batch = nn.MSELoss()(x_query_sample, x_query_gt).cpu().numpy()
             lh_query = mse_batch.mean()
             lh_query_var = mse_batch.var()
@@ -113,17 +114,18 @@ def get_config(config):
 
 ############ Parameter Parsing ############
 parser = argparse.ArgumentParser()
-parser.add_argument('--path', nargs='?', type=str ,help='Experiment name.')
-exp_path = parser.parse_args().path
-print(exp_path)
-config_file = exp_path + "config.conf"
+parser.add_argument('--exp_name', nargs='?', type=str, default="rrc" ,help='Experiment name.')
+parser.add_argument('--config', nargs='?', type=str, default="./config.conf" ,help='Config filename.')
+config_file = parser.parse_args().config
 config = configparser.ConfigParser()
 config.read(config_file)
 args = get_config(config)
+args.exp_name = parser.parse_args().exp_name
 args.img_size = (args.v[0]*args.down_size, args.v[1]*args.down_size)
 
 # Print 
 print("Configure File: %s"%(config_file))
+print("Experiment Name: %s"%(args.exp_name))
 print("Number of world cells: %d"%(args.w))
 print("Size of view cells: " + str(args.v))
 print("Number of concepts: %d"%(args.c))
@@ -145,103 +147,152 @@ print("Train data: ", len(train_dataset))
 print("Test data: ", len(test_dataset))
 
 ############ Create Folder ############
-result_path = exp_path + "result/"
-save_path = exp_path + "save/"
-if not os.path.exists(result_path):
-    os.makedirs(result_path)
+now = datetime.datetime.now()
+#tinfo = "%d-%d-%d_%d-%d"%(now.year, now.month, now.day, now.hour, now.minute) #second / microsecond
+tinfo = "%d-%d-%d"%(now.year, now.month, now.day)
+exp_path = "experiments/"
+model_name = args.exp_name + "_w%d_c%d"%(args.w, args.c)
+model_path = exp_path + tinfo + "_" + model_name + "/"
+
+img_path = model_path + "img/"
+save_path = model_path + "save/"
+if not os.path.exists(img_path):
+    os.makedirs(img_path)
+if not os.path.exists(save_path):
+    os.makedirs(save_path)
+
+# Save config file
+with open(model_path + 'config.conf', 'w') as cfile:
+    config.write(cfile)
 
 ############ Networks ############
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 net = SRGQN(n_wrd_cells=args.w, view_size=args.v, csize=args.c, ch=args.ch, vsize=7, \
     draw_layers=args.draw_layers, down_size=args.down_size, share_core=args.share_core).to(device)
-net.load_state_dict(torch.load(save_path+"srgqn.pth"))
-net.eval()
+params = list(net.parameters())
+opt = optim.Adam(params, lr=5e-5, betas=(0.5, 0.999))
 
-####
-train_loader = DataLoader(train_dataset, batch_size=1, shuffle=True)
-test_loader = DataLoader(test_dataset, batch_size=1, shuffle=True)
+############ Training ############
+max_obs_size = args.max_obs_size
+total_steps = args.total_steps
+total_epochs = args.total_epochs
+train_record = {"loss_query":[], "lh_query":[], "kl_query":[]}
+eval_record = {"mse_train":[], "kl_train":[], "mse_test":[], "kl_test":[]}
+best_mse = 999999
+print("Start training ...")
+print("==============================")
+steps = 0
+epochs = 0
+start_time = str(datetime.datetime.now())
+while(True):
+    epochs += 1
+    print("Experiment start time", start_time)
+    print("Start Epoch", epochs, ", time:", str(datetime.datetime.now()))
+    # ------------ Shuffle Datasets ------------
+    train_loader = DataLoader(train_dataset, batch_size=1, shuffle=True)
+    test_loader = DataLoader(test_dataset, batch_size=1, shuffle=True)
+    loss_query_list, lh_query_list, kl_query_list = [], [], []
+    # ------------ One Epoch ------------
+    for it, batch in enumerate(train_loader):
+        image = batch[0].squeeze(0)
+        pose = batch[1].squeeze(0)
 
-gen_size = 10
-print("Generate image ...")
-for i in range(1,6):
-    obs_size = i
-    # Train
-    fname = result_path + "train_" + "obs" + str(i) + ".png"
-    canvas = draw_result(net, train_dataset, obs_size, gen_size)
-    cv2.imwrite(fname, canvas)
-    # Test
-    fname = result_path + "test_" + "obs" + str(i) + ".png"
-    canvas = draw_result(net, test_dataset, obs_size, gen_size)
-    cv2.imwrite(fname, canvas)
+        # ------------ Get data (Random Observation) ------------
+        obs_size = np.random.randint(1,max_obs_size)
+        obs_idx = np.random.choice(image.shape[1], obs_size)
+        query_idx = np.random.randint(0, image.shape[1]-1)
+        
+        x_obs = image[:,obs_idx].reshape(-1,3,args.img_size[0],args.img_size[1]).to(device)
+        v_obs = pose[:,obs_idx].reshape(-1,7).to(device)
+        x_query_gt = image[:,query_idx].to(device)
+        v_query = pose[:,query_idx].to(device)
 
-##############################
-data_loader = DataLoader(test_dataset, batch_size=1, shuffle=False)
+        # ------------ Get data (Fixed Observation) ------------
+        '''
+        obs_size = 3
+        x_obs = image[:,:obs_size].reshape(-1,3,64,64).to(device)
+        v_obs = pose[:,:obs_size].reshape(-1,7).to(device)
+        x_query_gt = image[:,obs_size+1].to(device)
+        v_query = pose[:,obs_size+1].to(device)
+        '''
 
-for it, batch in enumerate(data_loader):
-    image = batch[0].squeeze(0)
-    pose = batch[1].squeeze(0)
-    obs_size = 3
-    x_obs = image[0,0].permute(1,2,0).numpy()
-    x_query = image[0,1].permute(1,2,0).numpy()
-    v_obs = pose[0,0].reshape(-1,7).to(device)
-    v_query = pose[0,1].reshape(-1,7).to(device)
-    #print(v_obs, v_query)
+        # ------------ Forward ------------
+        net.zero_grad()
+        x_query, kl_query = net(x_obs, v_obs, x_query_gt, v_query, n_obs=obs_size)
+        lh_query = nn.MSELoss()(x_query, x_query_gt).mean()
+        #kl_query = torch.mean(torch.sum(kl_query, dim=[1,2,3]))
+        loss_query = lh_query + args.kl_scale*kl_query
 
-    #view_cell_sim = np.zeros([16,16,128])
-    view_cell_sim = np.zeros([32,32,args.c])
-    #spos = (10,9)
-    spos = (20,18)
-    mag = 15.0
-    #kernal = np.array([[1,2,1],[2,8,2],[1,2,1]])
-    #kernal = np.array([[0,0,0],[0,10,0],[0,0,0]])
-    kernal = np.array([[1,4,7,4,1],[4,16,26,16,4],[7,26,41,26,7],[4,16,26,16,4],[1,4,7,4,1]])
-    #kernal = np.array([[2,4,5,4,2],[4,9,12,9,4],[5,12,15,12,5],[4,9,12,9,4],[2,4,5,4,2]])
+        # ------------ Train ------------
+        loss_query.backward()
+        opt.step()
+        steps += 1
+        
+        # ------------ Print Result ------------
+        if steps % 100 == 0:
+            loss_query = float(loss_query.detach().cpu().numpy())
+            lh_query = float(lh_query.detach().cpu().numpy())
+            kl_query = float(kl_query.detach().cpu().numpy())
 
-    for i in range(3):
-        view_cell_sim[spos[0]-2:spos[0]+3,spos[1]-2:spos[1]+3,i] = kernal
-    view_cell_sim /= mag
-    #view_cell_torch = torch.FloatTensor(view_cell_sim).reshape(1,16,16,128).permute(0,3,1,2).to(device)
-    view_cell_torch = torch.FloatTensor(view_cell_sim).reshape(1,32,32,args.c).permute(0,3,1,2).to(device)
-    rlist = []
-    for j in range(1,6):
-        routing = net.visualize_routing(view_cell_torch, v_obs, v_query, None, view_size=(32, 32))
-        #routing = routing.permute(0,2,3,1).detach().cpu().reshape(16,16,128).numpy()
-        routing = routing.permute(0,2,3,1).detach().cpu().reshape(32,32,args.c).numpy()
-        rlist.append(routing)
+            print("[Ep %s (%s/%s)] loss_q: %f| lh_q: %f| kl_q: %f"%( \
+                str(epochs).zfill(4), str(steps), str(total_steps), \
+                loss_query, lh_query, kl_query))
+            
+            loss_query_list.append(loss_query)
+            lh_query_list.append(lh_query)
+            kl_query_list.append(kl_query)
 
-    img_size = (128,128)
-    signal_obs = cv2.resize(view_cell_sim[:,:,0:3], img_size, interpolation=cv2.INTER_NEAREST)
-    signal_query = cv2.resize(rlist[3][:,:,0:3], img_size, interpolation=cv2.INTER_NEAREST)
-    print(np.max(signal_query))
-    signal_query = np.minimum(5*signal_query, 1.0)
-    x_obs = cv2.cvtColor(x_obs, cv2.COLOR_BGR2RGB)
-    x_obs = cv2.resize(x_obs, img_size, interpolation=cv2.INTER_NEAREST)
-    x_query = cv2.cvtColor(x_query, cv2.COLOR_BGR2RGB)
-    x_query = cv2.resize(x_query, img_size, interpolation=cv2.INTER_NEAREST)
-    x_obs_mask = x_obs * (signal_obs*0.7+0.3)
-    x_query_mask = x_query * (signal_query*0.7+0.3)
-    #print(np.min(signal_query))
+        # ------------ Output Image ------------
+        if steps % 1000 == 0:
+            print("------------------------------")
+            print("Generate image ...")
+            obs_size = 3
+            gen_size = 5
+            # Train
+            fname = img_path+str(int(steps/1000)).zfill(4)+"k_train.png"
+            canvas = draw_result(net, train_dataset, obs_size, gen_size, args.img_size)
+            cv2.imwrite(fname, canvas)
+            # Test
+            fname = img_path+str(int(steps/1000)).zfill(4)+"k_test.png"
+            canvas = draw_result(net, test_dataset, obs_size, gen_size, args.img_size)
+            cv2.imwrite(fname, canvas)
 
-    img_canvas = np.zeros([img_size[0]*2, img_size[0]*3, 3])
-    img_canvas[0:img_size[1],0:img_size[0],:] = x_obs
-    img_canvas[0:img_size[1],img_size[0]:img_size[0]*2,:] = x_obs_mask
-    img_canvas[0:img_size[1],img_size[0]*2:img_size[0]*3,:] = signal_obs
-    img_canvas[img_size[1]:img_size[1]*2,0:img_size[0],:] = x_query
-    img_canvas[img_size[1]:img_size[1]*2,img_size[0]:img_size[0]*2,:] = x_query_mask
-    img_canvas[img_size[1]:img_size[1]*2,img_size[0]*2:img_size[0]*3,:] = signal_query
-    fname = result_path + "route_" + str(it).zfill(2) + ".png"
-    cv2.imwrite(fname, img_canvas*255)
+            # ------------ Training Record ------------
+            train_record["loss_query"].append(loss_query_list)
+            train_record["lh_query"].append(lh_query_list)
+            train_record["kl_query"].append(kl_query_list)
+            print("Dump training record ...")
+            with open(model_path+'train_record.json', 'w') as file:
+                json.dump(train_record, file)
 
-    '''
-    cv2.imshow("signal_obs", signal_obs)
-    cv2.imshow("signal_query", signal_query)
-    cv2.imshow("x_obs", x_obs)
-    cv2.imshow("x_query", x_query)
-    cv2.imshow("x_obs_mask", x_obs_mask)
-    cv2.imshow("x_query_mask", x_query_mask)
-    cv2.imshow("canvas", img_canvas)
-    k = cv2.waitKey(0)
-    if k == ord('q'):
+            # ------------ Evaluation Record ------------
+            print("Evaluate Training Data ...")
+            lh_train, kl_train, _, _ = eval(net, train_dataset, obs_size=3, img_size=args.img_size)
+            print("Evaluate Testing Data ...")
+            lh_test, kl_test, _, _ = eval(net, test_dataset, obs_size=3, img_size=args.img_size)
+            eval_record["mse_train"].append(lh_train)
+            eval_record["kl_train"].append(kl_train)
+            eval_record["mse_test"].append(lh_test)
+            eval_record["kl_test"].append(kl_test)
+            print("Dump evaluation record ...")
+            with open(model_path+'eval_record.json', 'w') as file:
+                json.dump(eval_record, file)
+
+            # ------------ Save Model (One Epoch) ------------
+            if steps%100000 == 0:
+                print("Save model ...")
+                torch.save(net.state_dict(), save_path + "srgqn_" + str(steps).zfill(4) + ".pth")
+
+            if lh_test < best_mse:
+                best_mse = lh_test
+                print("Save best model ...")
+                torch.save(net.state_dict(), save_path + "srgqn.pth")
+            print("Best Test MSE:", best_mse)
+            print("------------------------------")
+
+    print("==============================")
+    if steps >= total_steps:
+        print("Save final model ...")
+        torch.save(net.state_dict(), save_path + "srgqn_final.pth")
         break
-    '''
-
+    

@@ -4,6 +4,7 @@ import torch.nn.functional as F
 import encoder
 import strn
 import generator
+import generator_vae
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -29,9 +30,10 @@ class SRGQN(nn.Module):
         self.down_size = down_size
         self.draw_layers = draw_layers
 
-        self.encoder = encoder.EncoderNetwork2(ch, csize, down_size).to(device)
+        self.encoder = encoder.EncoderNetwork3(ch, csize, down_size).to(device)
         self.strn = strn.STRN(n_wrd_cells, view_size=view_size, vsize=vsize, csize=csize).to(device)
-        self.generator = generator.GeneratorNetwork(x_dim=3, r_dim=csize, L=draw_layers, scale=down_size, share=share_core).to(device)
+        #self.generator = generator.GeneratorNetwork(x_dim=3, r_dim=csize, L=draw_layers, scale=down_size, share=share_core).to(device)
+        self.generator = generator_vae.GeneratorNetwork(z_dim=32, r_dim=csize).to(device)
 
     def step_observation_encode(self, x, v, view_size=None):
         if view_size is None:
