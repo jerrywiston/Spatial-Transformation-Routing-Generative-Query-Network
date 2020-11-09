@@ -1,5 +1,6 @@
 import os
 import argparse
+import configparser
 from tfrecord_converter import *
 
 parser = argparse.ArgumentParser(description='Convert tfrecord to pt file.')
@@ -9,14 +10,18 @@ parser.add_argument('--convert_path', nargs='?', type=str, default="GQN-Datasets
 parser.add_argument('--batch', nargs='?', type=int, default=32, help='Batch size.')
 args = parser.parse_args()
 
+config = configparser.ConfigParser()
+config.read("datasets_handle/dataset.conf")
+dataset_full_name = config.get(args.dataset, 'name')
+
 tf.enable_eager_execution()
 ###############################################
 print("Convert training data.")
-convert_dir_train = os.path.join(args.convert_path, args.dataset, "train")
+convert_dir_train = os.path.join(args.convert_path, dataset_full_name, "train")
 if not os.path.exists(convert_dir_train):
     os.makedirs(convert_dir_train)
 
-data_dir = os.path.join(args.download_path, args.dataset, "train")
+data_dir = os.path.join(args.download_path, dataset_full_name, "train")
 records = [os.path.join(data_dir, f) for f in sorted(os.listdir(data_dir))]
 records = [f for f in records if "tfrecord" in f and "gstmp" not in f]
 with mp.Pool(processes=mp.cpu_count()) as pool:
@@ -26,11 +31,11 @@ print("Done")
 
 ###############################################
 print("Convert testing data.")
-convert_dir_test = os.path.join(args.convert_path, args.dataset, "test")
+convert_dir_test = os.path.join(args.convert_path, dataset_full_name, "test")
 if not os.path.exists(convert_dir_test):
     os.makedirs(convert_dir_test)
 
-data_dir = os.path.join(args.download_path, args.dataset, "test")
+data_dir = os.path.join(args.download_path, dataset_full_name, "test")
 records = [os.path.join(data_dir, f) for f in sorted(os.listdir(data_dir))]
 records = [f for f in records if "tfrecord" in f and "gstmp" not in f]
 print(records)

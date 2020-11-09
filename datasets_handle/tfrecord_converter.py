@@ -27,7 +27,11 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 #POSE_DIM, IMG_DIM, SEQ_DIM = 5, 64, 15
 #POSE_DIM, IMG_DIM, SEQ_DIM = 5, 64, 10
 #POSE_DIM, IMG_DIM, SEQ_DIM = 5, 128, 4
-POSE_DIM, IMG_DIM, SEQ_DIM = 5, 128, 10
+#POSE_DIM, IMG_DIM, SEQ_DIM = 5, 128, 10
+default_args = lambda: None
+default_args.pose_dim = 5
+default_args.img_dim = 64
+default_args.seq_dim = 10
 
 def chunk(iterable, size=10):
     """
@@ -38,15 +42,15 @@ def chunk(iterable, size=10):
     for first in iterator:
         yield chain([first], islice(iterator, size - 1))
 
-def process(record):
+def process(record, args):
     """
     Processes a tf-record into a numpy (image, pose) tuple.
     """
     kwargs = dict(dtype=tf.uint8, back_prop=False)
     for data in tf.python_io.tf_record_iterator(record):
         instance = tf.parse_single_example(data, {
-            'frames': tf.FixedLenFeature(shape=SEQ_DIM, dtype=tf.string),
-            'cameras': tf.FixedLenFeature(shape=SEQ_DIM * POSE_DIM, dtype=tf.float32)
+            'frames': tf.FixedLenFeature(shape=args.seq_dim, dtype=tf.string),
+            'cameras': tf.FixedLenFeature(shape=args.seq_dim * args.pose_dim, dtype=tf.float32)
         })
 
         # Get data
@@ -55,14 +59,14 @@ def process(record):
 
         # Convert
         images = tf.map_fn(tf.image.decode_jpeg, tf.reshape(images, [-1]), **kwargs)
-        images = tf.reshape(images, (-1, SEQ_DIM, IMG_DIM, IMG_DIM, 3))
-        poses  = tf.reshape(poses,  (-1, SEQ_DIM, POSE_DIM))
+        images = tf.reshape(images, (-1, args.seq_dim, args.img_dim, args.img_dim, 3))
+        poses  = tf.reshape(poses,  (-1, args.seq_dim, args.pose_dim))
 
         # Numpy conversion
         images, poses = images.numpy(), poses.numpy()
         yield np.squeeze(images), np.squeeze(poses)
 
-def convert(record, batch_size, out_path):
+def convert(record, batch_size, out_path, args=default_args):
     """
     Processes and saves a tf-record.
     """
@@ -70,7 +74,7 @@ def convert(record, batch_size, out_path):
     basename, *_ = os.path.splitext(filename)
     print(basename)
 
-    batch_process = lambda r: chunk(process(r), batch_size)
+    batch_process = lambda r: chunk(process(r, args), batch_size)
 
     for i, batch in enumerate(batch_process(record)):
         p = os.path.join(out_path, "{0:}-{1:02}.pt.gz".format(basename, i))
