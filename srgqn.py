@@ -32,8 +32,8 @@ class SRGQN(nn.Module):
 
         self.encoder = encoder.EncoderNetwork3(ch, csize, down_size).to(device)
         self.strn = strn.STRN(n_wrd_cells, view_size=view_size, vsize=vsize, csize=csize).to(device)
-        #self.generator = generator.GeneratorNetwork(x_dim=3, r_dim=csize, L=draw_layers, scale=down_size, share=share_core).to(device)
-        self.generator = generator_vae.GeneratorNetwork(z_dim=32, r_dim=csize).to(device)
+        self.generator = generator.GeneratorNetwork(x_dim=3, r_dim=csize, L=draw_layers, scale=down_size, share=share_core).to(device)
+        #self.generator = generator_vae.GeneratorNetwork(z_dim=32, r_dim=csize).to(device)
 
     def step_observation_encode(self, x, v, view_size=None):
         if view_size is None:
