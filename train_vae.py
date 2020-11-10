@@ -183,6 +183,7 @@ print("Start training ...")
 print("==============================")
 steps = 0
 epochs = 0
+eval_step = 5000
 start_time = str(datetime.datetime.now())
 while(True):
     epochs += 1
@@ -243,17 +244,17 @@ while(True):
             kl_query_list.append(kl_query)
 
         # ------------ Output Image ------------
-        if steps % 1000 == 0:
+        if steps % eval_step == 0:
             print("------------------------------")
             print("Generate image ...")
             obs_size = 3
             gen_size = 5
             # Train
-            fname = img_path+str(int(steps/1000)).zfill(4)+"k_train.png"
+            fname = img_path+str(int(steps/eval_step)).zfill(4)+"_train.png"
             canvas = draw_result(net, train_dataset, obs_size, gen_size, args.img_size)
             cv2.imwrite(fname, canvas)
             # Test
-            fname = img_path+str(int(steps/1000)).zfill(4)+"k_test.png"
+            fname = img_path+str(int(steps/eval_step)).zfill(4)+"_test.png"
             canvas = draw_result(net, test_dataset, obs_size, gen_size, args.img_size)
             cv2.imwrite(fname, canvas)
 
@@ -295,4 +296,3 @@ while(True):
         print("Save final model ...")
         torch.save(net.state_dict(), save_path + "srgqn_final.pth")
         break
-    

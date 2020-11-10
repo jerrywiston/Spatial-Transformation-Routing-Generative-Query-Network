@@ -175,8 +175,19 @@ for i in range(1,6):
     cv2.imwrite(fname, canvas)
 
 ##############################
-data_loader = DataLoader(test_dataset, batch_size=1, shuffle=False)
+# Routing Visualization
+##############################
+def gaussian_heatmap(mean, std, size):
+    img = np.zeros(size, dtype=np.float32)
+    mean_pix = (mean[0]*size[0], mean[1]*size[1])
+    std_pix = std * size[0]
+    for i in range(size[0]):
+        for j in range(size[1]):
+            temp = ((i-mean_pix[0])**2 + (j-mean_pix[1])**2)/std_pix**2
+            img[i,j,:] = np.exp(-0.5 * temp) / (2*np.pi*std_pix**2)
+    return img
 
+data_loader = DataLoader(test_dataset, batch_size=1, shuffle=False)
 for it, batch in enumerate(data_loader):
     image = batch[0].squeeze(0)
     pose = batch[1].squeeze(0)
@@ -186,27 +197,16 @@ for it, batch in enumerate(data_loader):
     v_obs = pose[0,0].reshape(-1,7).to(device)
     v_query = pose[0,1].reshape(-1,7).to(device)
     #print(v_obs, v_query)
-
-    #view_cell_sim = np.zeros([16,16,128])
-    view_cell_sim = np.zeros([32,32,args.c])
-    #spos = (10,9)
-    spos = (20,18)
-    mag = 15.0
-    #kernal = np.array([[1,2,1],[2,8,2],[1,2,1]])
-    #kernal = np.array([[0,0,0],[0,10,0],[0,0,0]])
-    kernal = np.array([[1,4,7,4,1],[4,16,26,16,4],[7,26,41,26,7],[4,16,26,16,4],[1,4,7,4,1]])
-    #kernal = np.array([[2,4,5,4,2],[4,9,12,9,4],[5,12,15,12,5],[4,9,12,9,4],[2,4,5,4,2]])
-
-    for i in range(3):
-        view_cell_sim[spos[0]-2:spos[0]+3,spos[1]-2:spos[1]+3,i] = kernal
-    view_cell_sim /= mag
-    #view_cell_torch = torch.FloatTensor(view_cell_sim).reshape(1,16,16,128).permute(0,3,1,2).to(device)
-    view_cell_torch = torch.FloatTensor(view_cell_sim).reshape(1,32,32,args.c).permute(0,3,1,2).to(device)
+    
+    feat_size = 32
+    std = 0.06#0.05
+    hp = gaussian_heatmap((0.8,0.5), std, (feat_size,feat_size,args.c))
+    view_cell_sim = hp / np.max(hp) * 0.8
+    view_cell_torch = torch.FloatTensor(view_cell_sim).reshape(1,feat_size,feat_size,args.c).permute(0,3,1,2).to(device)
     rlist = []
     for j in range(1,6):
-        routing = net.visualize_routing(view_cell_torch, v_obs, v_query, None, view_size=(32, 32))
-        #routing = routing.permute(0,2,3,1).detach().cpu().reshape(16,16,128).numpy()
-        routing = routing.permute(0,2,3,1).detach().cpu().reshape(32,32,args.c).numpy()
+        routing = net.visualize_routing(view_cell_torch, v_obs, v_query, None, view_size=(feat_size, feat_size))
+        routing = routing.permute(0,2,3,1).detach().cpu().reshape(feat_size,feat_size,args.c).numpy()
         rlist.append(routing)
 
     img_size = (128,128)
@@ -245,3 +245,30 @@ for it, batch in enumerate(data_loader):
         break
     '''
 
+data_loader = DataLoader(test_dataset, batch_size=1, shuffle=False)
+for it, batch in enumerate(data_loader):
+    image = batch[0].squeeze(0)
+    pose = batch[1].squeeze(0)
+    obs_size = 3
+    x_obs = image[0,0].permute(1,2,0).numpy()
+    x_query = image[0,1].permute(1,2,0).numpy()
+    v_obs = pose[0,0].reshape(-1,7)
+    v_query = pose[0,1].reshape(-1,7)
+    print(v_obs[0], v_query[0])
+    
+    # Draw Epipolar Line
+    fov = 50.0
+    f = 32 / np.tan(np.deg2rad(fov/2))
+    cx, cy = 0, 0
+    cam_int = np.array([[f,0,cx],[0,f,cy],[0,0,1]])
+    theta = 30
+    t = (v_obs[0,0]-v_query[0,0], v_obs[0,1]-v_query[0,1], v_obs[0,2]-v_query[0,2])
+    r_obs = np.array([[v_obs[0,3], -v_obs[0,4], 0],[v_obs[0,4], v_obs[0,3], 0],[0,0,1]])
+    r_query = np.array([[v_query[0,3], -v_query[0,4], 0],[v_query[0,4], v_query[0,3], 0],[0,0,1]])
+    r = np.matmul(r_query, np.linalg.inv(r_obs))
+    t_cross = np.array([[0,-t[2],t[1]],[t[2],0,-t[0]],[-t[1],t[0],0]])
+    E = np.matmul(t_cross,r)
+    F = np.matmul(np.linalg.inv(cam_int.T), E)
+    F = np.matmul(F, np.linalg.inv(cam_int))
+    print(F)
+    break

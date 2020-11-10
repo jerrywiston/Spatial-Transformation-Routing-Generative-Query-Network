@@ -54,12 +54,12 @@ class STRN(nn.Module):
         
         # Cross-Space Cell Relation
         relation = torch.bmm(cs_embedding, vs_embedding.permute(0,2,1)) #(-1, wrd_cell, view_cell)
-        return relation, activation
+        return relation, activation, wcode
 
     def forward(self, view_cell, v, view_size=None):
         if view_size is None:
             view_size = self.view_size
-        relation, activation = self.transform(v, view_size=view_size)
+        relation, activation, wcode = self.transform(v, view_size=view_size)
         distribution = torch.softmax(relation, 2)
         route = distribution * activation   # (-1, n_wrd_cells, n_view_cells)
         wrd_cell = torch.bmm(view_cell, route.permute(0,2,1))
@@ -68,7 +68,7 @@ class STRN(nn.Module):
     def query(self, wrd_cell, v, view_size=None, steps=None):
         if view_size is None:
             view_size = self.view_size
-        relation, activation = self.transform(v, view_size=view_size)
+        relation, activation, wcode = self.transform(v, view_size=view_size)
         distribution = torch.softmax(relation, 1)
         route = distribution * activation   # (-1, n_wrd_cells, n_view_cells)
         query_view_cell = torch.bmm(wrd_cell, route).reshape(-1, self.csize, view_size[0], view_size[1])
