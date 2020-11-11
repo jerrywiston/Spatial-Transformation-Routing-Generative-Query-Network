@@ -187,6 +187,18 @@ def gaussian_heatmap(mean, std, size):
             img[i,j,:] = np.exp(-0.5 * temp) / (2*np.pi*std_pix**2)
     return img
 
+def drawlines(img,lines,pts):
+    ''' img1 - image on which we draw the epilines for the points in img2
+        lines - corresponding epilines '''
+    r,c,_ = img.shape
+    img = cv2.cvtColor(img[:,:,0],cv2.COLOR_GRAY2RGB)
+    for r,pt in zip(lines,pts):
+        color = tuple([0,0,255])
+        x0,y0 = map(int, [0, -r[0,2]/r[0,1] ])
+        x1,y1 = map(int, [c, -(r[0,2]+r[0,0]*c)/r[0,1] ])
+        img = cv2.line(img, (x0,y0), (x1,y1), color,1)
+    return img
+
 data_loader = DataLoader(test_dataset, batch_size=1, shuffle=False)
 for it, batch in enumerate(data_loader):
     image = batch[0].squeeze(0)
@@ -198,9 +210,10 @@ for it, batch in enumerate(data_loader):
     v_query = pose[0,1].reshape(-1,7).to(device)
     #print(v_obs, v_query)
     
-    feat_size = 32
+    feat_size = 16
     std = 0.06#0.05
-    hp = gaussian_heatmap((0.8,0.5), std, (feat_size,feat_size,args.c))
+    spos = (0.7,0.5)#(0.7,0.3)#(0.8,0.5)
+    hp = gaussian_heatmap(spos, std, (feat_size,feat_size,args.c))
     view_cell_sim = hp / np.max(hp) * 0.8
     view_cell_torch = torch.FloatTensor(view_cell_sim).reshape(1,feat_size,feat_size,args.c).permute(0,3,1,2).to(device)
     rlist = []
@@ -231,7 +244,6 @@ for it, batch in enumerate(data_loader):
     img_canvas[img_size[1]:img_size[1]*2,img_size[0]*2:img_size[0]*3,:] = signal_query
     fname = result_path + "route_" + str(it).zfill(2) + ".png"
     cv2.imwrite(fname, img_canvas*255)
-
     '''
     cv2.imshow("signal_obs", signal_obs)
     cv2.imshow("signal_query", signal_query)
@@ -239,14 +251,10 @@ for it, batch in enumerate(data_loader):
     cv2.imshow("x_query", x_query)
     cv2.imshow("x_obs_mask", x_obs_mask)
     cv2.imshow("x_query_mask", x_query_mask)
-    cv2.imshow("canvas", img_canvas)
-    k = cv2.waitKey(0)
-    if k == ord('q'):
-        break
     '''
+    cv2.imshow("canvas", img_canvas)
 
-data_loader = DataLoader(test_dataset, batch_size=1, shuffle=False)
-for it, batch in enumerate(data_loader):
+    fov = 50.0
     image = batch[0].squeeze(0)
     pose = batch[1].squeeze(0)
     obs_size = 3
@@ -256,19 +264,60 @@ for it, batch in enumerate(data_loader):
     v_query = pose[0,1].reshape(-1,7)
     print(v_obs[0], v_query[0])
     
+    map_size = 128
+    fill_size = 8
+    line_size = 200
+    img_map = np.zeros((map_size+2*fill_size, map_size+2*fill_size,3))
+    # Observation
+    obs_pos = (fill_size+int(map_size/2*(1+v_obs[0,0])), fill_size+int(map_size/2*(1+v_obs[0,1])))
+    obs_ang = np.rad2deg(np.arctan2(v_obs[0,4], v_obs[0,3]))
+    obs_line1 = (int(obs_pos[0] + line_size*np.cos(np.deg2rad(obs_ang))), int(obs_pos[1] + line_size*np.sin(np.deg2rad(obs_ang))))
+    obs_line2 = (int(obs_pos[0] + line_size*np.cos(np.deg2rad(obs_ang+fov/2))), int(obs_pos[1] + line_size*np.sin(np.deg2rad(obs_ang+fov/2))))
+    obs_line3 = (int(obs_pos[0] + line_size*np.cos(np.deg2rad(obs_ang-fov/2))), int(obs_pos[1] + line_size*np.sin(np.deg2rad(obs_ang-fov/2))))
+    # Query
+    query_pos = (fill_size+int(map_size/2*(1+v_query[0,0])), fill_size+int(map_size/2*(1+v_query[0,1])))
+    query_ang = np.rad2deg(np.arctan2(v_query[0,4], v_query[0,3]))
+    query_line1 = (int(query_pos[0] + line_size*np.cos(np.deg2rad(query_ang))), int(query_pos[1] + line_size*np.sin(np.deg2rad(query_ang))))
+    query_line2 = (int(query_pos[0] + line_size*np.cos(np.deg2rad(query_ang+fov/2))), int(query_pos[1] + line_size*np.sin(np.deg2rad(query_ang+fov/2))))
+    query_line3 = (int(query_pos[0] + line_size*np.cos(np.deg2rad(query_ang-fov/2))), int(query_pos[1] + line_size*np.sin(np.deg2rad(query_ang-fov/2))))
+    print("ang", obs_ang, query_ang)
+    ##
+    center_pos = (int(map_size/2+fill_size), int(map_size/2+fill_size))
+    cv2.circle(img_map, center_pos, int(map_size/2), (0,1,0), 1)
+    #
+    cv2.circle(img_map, obs_pos, 5, (1,0,0), 3)
+    cv2.line(img_map, obs_pos, obs_line1, (1,0,0), 1)
+    cv2.line(img_map, obs_pos, obs_line2, (1,0,0), 2)
+    cv2.line(img_map, obs_pos, obs_line3, (1,0,0), 2)
+    #
+    cv2.circle(img_map, query_pos, 5, (0,0,1), 3)
+    cv2.line(img_map, query_pos, query_line1, (0,0,1), 1)
+    cv2.line(img_map, query_pos, query_line2, (0,0,1), 2)
+    cv2.line(img_map, query_pos, query_line3, (0,0,1), 2)
+    img_map = cv2.flip(img_map, 0)
+    cv2.imshow("map", img_map)
+
     # Draw Epipolar Line
-    fov = 50.0
-    f = 32 / np.tan(np.deg2rad(fov/2))
-    cx, cy = 0, 0
+    f = feat_size / np.tan(np.deg2rad(fov/2))
+    cx, cy = feat_size/2, feat_size/2
     cam_int = np.array([[f,0,cx],[0,f,cy],[0,0,1]])
-    theta = 30
-    t = (v_obs[0,0]-v_query[0,0], v_obs[0,1]-v_query[0,1], v_obs[0,2]-v_query[0,2])
-    r_obs = np.array([[v_obs[0,3], -v_obs[0,4], 0],[v_obs[0,4], v_obs[0,3], 0],[0,0,1]])
-    r_query = np.array([[v_query[0,3], -v_query[0,4], 0],[v_query[0,4], v_query[0,3], 0],[0,0,1]])
-    r = np.matmul(r_query, np.linalg.inv(r_obs))
-    t_cross = np.array([[0,-t[2],t[1]],[t[2],0,-t[0]],[-t[1],t[0],0]])
-    E = np.matmul(t_cross,r)
-    F = np.matmul(np.linalg.inv(cam_int.T), E)
-    F = np.matmul(F, np.linalg.inv(cam_int))
-    print(F)
-    break
+    ang = np.deg2rad(query_ang - obs_ang)
+    r = -np.array([[np.cos(ang), -np.sin(ang), 0],[np.sin(ang), np.cos(ang), 0],[0,0,1]])
+    t = -np.array((v_query[0,0]-v_obs[0,0], v_query[0,1]-v_obs[0,1], v_query[0,2]-v_obs[0,2]))
+    print(t, np.rad2deg(ang))
+    t_cross = np.array( [[0,-t[2],t[1]],
+                        [t[2],0,-t[0]],
+                        [-t[1],t[0],0]])
+    # E = t x R
+    E = t_cross.dot(r)
+    # F = k^(-T) E k^(-1)
+    F = np.linalg.inv(cam_int).T.dot(E).dot(np.linalg.inv(cam_int))
+    
+    pts = np.array([[[spos[1]*feat_size],[feat_size-spos[0]*feat_size]]])
+    line = cv2.computeCorrespondEpilines(pts, 2, F)
+    img = drawlines(signal_query,line,pts)
+    cv2.imshow("test", img)
+
+    k = cv2.waitKey(0)
+    if k == ord('q'):
+        break
