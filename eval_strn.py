@@ -181,10 +181,10 @@ def gaussian_heatmap(mean, std, size):
     img = np.zeros(size, dtype=np.float32)
     mean_pix = (mean[0]*size[0], mean[1]*size[1])
     std_pix = std * size[0]
-    for i in range(size[0]):
-        for j in range(size[1]):
+    for i in range(size[1]):
+        for j in range(size[0]):
             temp = ((i-mean_pix[0])**2 + (j-mean_pix[1])**2)/std_pix**2
-            img[i,j,:] = np.exp(-0.5 * temp) / (2*np.pi*std_pix**2)
+            img[j,i,:] = np.exp(-0.5 * temp) / (2*np.pi*std_pix**2)
     return img
 
 def drawlines(img,lines,pts):
@@ -192,11 +192,13 @@ def drawlines(img,lines,pts):
         lines - corresponding epilines '''
     r,c,_ = img.shape
     img = cv2.cvtColor(img[:,:,0],cv2.COLOR_GRAY2RGB)
+    img = cv2.flip(img,0)
     for r,pt in zip(lines,pts):
         color = tuple([0,0,255])
         x0,y0 = map(int, [0, -r[2]/r[1] ])
         x1,y1 = map(int, [c, -(r[2]+r[0]*c)/r[1] ])
         img = cv2.line(img, (x0,y0), (x1,y1), color,1)
+    img = cv2.flip(img,0)
     return img
 
 def crossmat(vec):
@@ -216,10 +218,11 @@ for it, batch in enumerate(data_loader):
     #print(v_obs, v_query)
     
     feat_size = 16
-    std = 0.06#0.05
-    spos = (0.8,0.3)#(0.7,0.5)#(0.7,0.3)#(0.8,0.5)
+    std = 0.04#0.05
+    spos = (0.5,0.7)#(0.3,0.7)#(0.5,0.8)
     hp = gaussian_heatmap(spos, std, (feat_size,feat_size,args.c))
-    view_cell_sim = hp / np.max(hp) * 0.8
+    view_cell_sim = hp / np.max(hp) * 1.5 #np.log(hp/(1-hp)+1e-10)
+    print(view_cell_sim.max(), view_cell_sim.min())
     view_cell_torch = torch.FloatTensor(view_cell_sim).reshape(1,feat_size,feat_size,args.c).permute(0,3,1,2).to(device)
     rlist = []
     for j in range(1,6):
@@ -247,8 +250,8 @@ for it, batch in enumerate(data_loader):
     img_canvas[img_size[1]:img_size[1]*2,0:img_size[0],:] = x_query
     img_canvas[img_size[1]:img_size[1]*2,img_size[0]:img_size[0]*2,:] = x_query_mask
     img_canvas[img_size[1]:img_size[1]*2,img_size[0]*2:img_size[0]*3,:] = signal_query
-    fname = result_path + "route_" + str(it).zfill(2) + ".png"
-    cv2.imwrite(fname, img_canvas*255)
+    
+    #cv2.imwrite(fname, img_canvas*255)
     '''
     cv2.imshow("signal_obs", signal_obs)
     cv2.imshow("signal_query", signal_query)
@@ -257,9 +260,11 @@ for it, batch in enumerate(data_loader):
     cv2.imshow("x_obs_mask", x_obs_mask)
     cv2.imshow("x_query_mask", x_query_mask)
     '''
-    cv2.imshow("canvas", img_canvas)
 
-    fov = 50.0
+    #############################
+    # Epipolar Line
+    #############################
+    fov = 50
     image = batch[0].squeeze(0)
     pose = batch[1].squeeze(0)
     obs_size = 3
@@ -269,9 +274,9 @@ for it, batch in enumerate(data_loader):
     v_query = pose[0,1].reshape(-1,7)
     print(v_obs[0], v_query[0])
     
-    map_size = 128
+    map_size = 240
     fill_size = 8
-    line_size = 200
+    line_size = 400
     img_map = np.zeros((map_size+2*fill_size, map_size+2*fill_size,3))
     # Observation
     obs_pos = (fill_size+int(map_size/2*(1+v_obs[0,0])), fill_size+int(map_size/2*(1+v_obs[0,1])))
@@ -306,37 +311,71 @@ for it, batch in enumerate(data_loader):
     cv2.imwrite(fname, img_map*255)
 
     # Draw Epipolar Line
-    f = 1 / np.tan(np.deg2rad(fov/2))
-    cx, cy = feat_size/2, feat_size/2
-    cam_int = np.array([[f,0,cx],[0,f,cy],[0,0,1]])
+    f = feat_size / np.tan(np.deg2rad(fov/2)) /2
+    cx, cy = (feat_size-1)/2, (feat_size-1)/2
+    cam_int = np.array([[f,0,cx],
+                        [0,f,cy],
+                        [0,0,1]])
+    print("Camera Int:")
+    print(cam_int)
     #
-    M1 = np.array([ [np.cos(obs_ang), -np.sin(obs_ang), 0, v_obs[0,0]],
-                    [np.sin(obs_ang),  np.cos(obs_ang), 0, v_obs[0,1]],
-                    [ 0, 0, 1, v_obs[0,2]],
+    pih = -np.pi/2
+    M1 = np.array([ [np.cos(-obs_ang+pih), 0, np.sin(-obs_ang+pih), v_obs[0,0]],
+                    [ 0, 1, 0, v_obs[0,2]],
+                    [-np.sin(-obs_ang+pih), 0, np.cos(-obs_ang+pih), v_obs[0,1]],
                     [0,0,0,1]])
-    M2 = np.array([ [np.cos(query_ang), -np.sin(query_ang), 0, v_query[0,0]],
-                    [np.sin(query_ang),  np.cos(query_ang), 0, v_query[0,1]],
-                    [ 0, 0, 1, v_query[0,2]],
+    M2 = np.array([ [np.cos(-query_ang+pih), 0, np.sin(-query_ang+pih), v_query[0,0]],
+                    [ 0, 1, 0, v_query[0,2]],                
+                    [-np.sin(-query_ang+pih), 0, np.cos(-query_ang+pih), v_query[0,1]],
                     [0,0,0,1]])
-    
+
     #Rel = np.linalg.inv(M1) @ M2
-    #Rel = np.linalg.inv(M2) @ M1
-    Rel = M2 @ np.linalg.inv(M1) 
+    Rel = np.linalg.inv(M2) @ M1
+    #Rel = M1 @ np.linalg.inv(M2) 
+    #Rel = M2 @ np.linalg.inv(M1) 
+    print("Relative POse:")
     print(Rel)
+    print("Relative Angle:")
+    print(np.rad2deg(np.arctan2(Rel[1,0],Rel[0,0])))
+    
     R = Rel[:3,:3]
     t = Rel[:3,3]
-    #t = M2[:3,3] - M1[:3,3]
-    #t = np.linalg.inv(M1[:3,:3]) @ t.T
-    E = crossmat(t).dot(R)
-    F = (np.linalg.inv(cam_int).T).dot(E.T).dot(np.linalg.inv(cam_int))
+    print(R,t)
+    E = (crossmat(t).dot(R)).T
+    F = (np.linalg.inv(cam_int).T).dot(E).dot(np.linalg.inv(cam_int))
+    print("F:")
+    pt = np.array([(spos[0])*feat_size, (spos[1])*feat_size, 1])
     print(F)
+    FX = F @ pt
+    FX = (FX/np.sqrt(FX[0]**2+FX[1]**2)).reshape(-1,3)
+    print(FX)
+    ###
+    ptt = np.array([0.5*feat_size,1*feat_size,1])
+    ptt = np.linalg.inv(cam_int).dot(ptt)
+    print(ptt)
+    print(np.tan(np.deg2rad(25)))
     
-    pts = np.array([[[spos[1]*feat_size],[(1-spos[0])*feat_size]]])
-    line = cv2.computeCorrespondEpilines(pts, 1, F)[0]
-    print(line)
-    img = drawlines(rlist[3][:,:,0:3],line,pts)
-    img = cv2.resize(img, (256,256), interpolation=cv2.INTER_NEAREST)
-    cv2.imshow("test", img)
+    pts = np.array([(spos[0])*feat_size, (1-spos[1])*feat_size])
+    line = cv2.computeCorrespondEpilines(pts.reshape(-1,1,2), 2, F)
+    line = line.reshape(-1,3)
+    print("Line:", line)
+    print(np.rad2deg(np.arctan2(line[0,1],line[0,0])))
+
+    epi_img2 = 4*rlist[3][:,:,0:3]
+    #epi_img2 = np.zeros((feat_size, feat_size, 3), dtype=np.float32)
+    epi_img2 = drawlines(epi_img2,line,pts)
+    epi_img2 = cv2.resize(epi_img2, img_size, interpolation=cv2.INTER_NEAREST)
+    
+    epi_img1 = signal_obs.copy()
+    #epi_img1 = np.zeros((img_size[0], img_size[1], 3), dtype=np.float32)
+    cv2.circle(epi_img1, (int(img_size[0]*spos[0]),int(img_size[1]*spos[1])), int(1.5*std*img_size[0]), (0,0,1) , 6)
+    epi_img = cv2.vconcat([epi_img1, epi_img2])
+
+    img_canvas = img_canvas.astype(np.float32)
+    img_canvas = cv2.hconcat([img_canvas, epi_img])
+    fname = result_path + "route_" + str(it).zfill(2) + ".png"
+    cv2.imwrite(fname, img_canvas*255)
+    cv2.imshow("canvas", img_canvas)
 
     k = cv2.waitKey(0)
     if k == ord('q'):

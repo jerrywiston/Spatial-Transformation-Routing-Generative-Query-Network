@@ -45,7 +45,7 @@ data_dir = os.path.join(args.download_path, dataset_full_name, "test")
 records = [os.path.join(data_dir, f) for f in sorted(os.listdir(data_dir))]
 records = [f for f in records if "tfrecord" in f and "gstmp" not in f]
 for r in records:
-    convert(r, batch_size=args.batch, out_path=convert_dir_train, args=dataset_args)
+    convert(r, batch_size=args.batch, out_path=convert_dir_test, args=dataset_args)
 #with mp.Pool(processes=mp.cpu_count()) as pool:
 #    f = partial(convert, batch_size=args.batch, out_path=convert_dir_test)
 #    pool.map(f, records)
