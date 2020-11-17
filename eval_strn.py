@@ -137,11 +137,10 @@ else:
 
 ############ Dataset ############
 path = args.data_path
-train_dataset = GqnDatasets(root_dir=path, train=True, fraction=args.frac_train)
+#train_dataset = GqnDatasets(root_dir=path, train=True, fraction=args.frac_train)
 test_dataset = GqnDatasets(root_dir=path, train=False, fraction=args.frac_test)
 print("Data path: %s"%(args.data_path))
 print("Data fraction: %f / %f"%(args.frac_train, args.frac_test))
-print("Train data: ", len(train_dataset))
 print("Test data: ", len(test_dataset))
 
 ############ Create Folder ############
@@ -158,22 +157,21 @@ net.load_state_dict(torch.load(save_path+"srgqn.pth"))
 net.eval()
 
 ####
-train_loader = DataLoader(train_dataset, batch_size=1, shuffle=True)
 test_loader = DataLoader(test_dataset, batch_size=1, shuffle=True)
-
+'''
 gen_size = 10
 print("Generate image ...")
 for i in range(1,6):
     obs_size = i
     # Train
-    fname = result_path + "train_" + "obs" + str(i) + ".png"
-    canvas = draw_result(net, train_dataset, obs_size, gen_size)
-    cv2.imwrite(fname, canvas)
+    #fname = result_path + "train_" + "obs" + str(i) + ".png"
+    #canvas = draw_result(net, train_dataset, obs_size, gen_size)
+    #cv2.imwrite(fname, canvas)
     # Test
     fname = result_path + "test_" + "obs" + str(i) + ".png"
-    canvas = draw_result(net, test_dataset, obs_size, gen_size)
+    canvas = draw_result(net, test_dataset, obs_size, gen_size, img_size=(128,128))
     cv2.imwrite(fname, canvas)
-
+'''
 ##############################
 # Routing Visualization
 ##############################
@@ -218,11 +216,17 @@ for it, batch in enumerate(data_loader):
     #print(v_obs, v_query)
     
     feat_size = 16
-    std = 0.04#0.05
+    std = 0.05#0.05
     spos = (0.5,0.7)#(0.3,0.7)#(0.5,0.8)
+    #spos = np.random.rand(2)
+    #spos[0] = spos[0]*0.6+0.2
+    #spos[1] = spos[1]*0.3+0.6
+    print("spos", spos)
     hp = gaussian_heatmap(spos, std, (feat_size,feat_size,args.c))
+    #hp = np.zeros(hp.shape,dtype=np.float32)
+    #hp[int(feat_size*spos[1]),int(feat_size*spos[0])] = 1
     view_cell_sim = hp / np.max(hp) * 1.5 #np.log(hp/(1-hp)+1e-10)
-    print(view_cell_sim.max(), view_cell_sim.min())
+    #print(view_cell_sim.max(), view_cell_sim.min())
     view_cell_torch = torch.FloatTensor(view_cell_sim).reshape(1,feat_size,feat_size,args.c).permute(0,3,1,2).to(device)
     rlist = []
     for j in range(1,6):
@@ -233,7 +237,7 @@ for it, batch in enumerate(data_loader):
     img_size = (128,128)
     signal_obs = cv2.resize(view_cell_sim[:,:,0:3], img_size, interpolation=cv2.INTER_NEAREST)
     signal_query = cv2.resize(rlist[3][:,:,0:3], img_size, interpolation=cv2.INTER_NEAREST)
-    print(np.max(signal_query))
+    #print(np.max(signal_query))
     signal_query = np.minimum(5*signal_query, 1.0)
     x_obs = cv2.cvtColor(x_obs, cv2.COLOR_BGR2RGB)
     x_obs = cv2.resize(x_obs, img_size, interpolation=cv2.INTER_NEAREST)
@@ -272,7 +276,7 @@ for it, batch in enumerate(data_loader):
     x_query = image[0,1].permute(1,2,0).numpy()
     v_obs = pose[0,0].reshape(-1,7)
     v_query = pose[0,1].reshape(-1,7)
-    print(v_obs[0], v_query[0])
+    #print(v_obs[0], v_query[0])
     
     map_size = 240
     fill_size = 8
@@ -369,14 +373,18 @@ for it, batch in enumerate(data_loader):
     epi_img1 = signal_obs.copy()
     #epi_img1 = np.zeros((img_size[0], img_size[1], 3), dtype=np.float32)
     cv2.circle(epi_img1, (int(img_size[0]*spos[0]),int(img_size[1]*spos[1])), int(1.5*std*img_size[0]), (0,0,1) , 6)
+    
     epi_img = cv2.vconcat([epi_img1, epi_img2])
-
     img_canvas = img_canvas.astype(np.float32)
     img_canvas = cv2.hconcat([img_canvas, epi_img])
+
+    #img_canvas[0:img_size[1],img_size[0]*2:img_size[0]*3,:] = epi_img1
+    #img_canvas[img_size[1]:img_size[1]*2,img_size[0]*2:img_size[0]*3,:] = epi_img2
+
     fname = result_path + "route_" + str(it).zfill(2) + ".png"
     cv2.imwrite(fname, img_canvas*255)
     cv2.imshow("canvas", img_canvas)
 
-    k = cv2.waitKey(0)
+    k = cv2.waitKey(1)
     if k == ord('q'):
         break
