@@ -99,7 +99,17 @@ class SRGQN(nn.Module):
         self.wrd_cell_record = self.step_observation_encode(x, v)
         self.scene_cell_record = torch.sigmoid(torch.sum(self.wrd_cell_record, 0, keepdim=True))
 
-    def scene_render(self, vq):
+    def scene_render(self, vq, obs_act=None):
+        if obs_act is not None:
+            first = False
+            for i in range(obs_act.shape[0]):
+                if obs_act[i] == 0:
+                    continue
+                if not first:
+                    self.scene_cell_record = self.wrd_cell_record[i:i+1]
+                else:
+                    self.scene_cell_record += self.wrd_cell_record[i:i+1]
+        self.scene_cell_record = torch.sigmoid(self.scene_cell_record)
         sample_size = (self.view_size[0]*self.down_size, self.view_size[1]*self.down_size)
         x_query = self.step_query_view_sample(self.scene_cell_record, vq)
         return x_query

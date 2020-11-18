@@ -66,16 +66,35 @@ net = SRGQN(n_wrd_cells=args.w, view_size=args.v, csize=args.c, ch=args.ch, vsiz
 net.load_state_dict(torch.load(save_path+"srgqn.pth"))
 net.eval()
 
-####
+############ Parameters ############
 data_loader = DataLoader(test_dataset, batch_size=1, shuffle=False)
 img_size = (256,256)
 fov = 50
 map_size = 240
 fill_size = 8
-line_size = 30#400
 obs_size = 8
 human_control = False#True
+obs_act = np.array([0]*obs_size)
 
+############ Events ############
+def onMouse(event, x, y, flags, param):
+    global obs_act, img_size
+    if event == cv2.EVENT_LBUTTONDOWN:
+        #print('\nx = %d, y = %d'%(x, y))
+        idxy = (int(x/img_size[1]*2), int(y/img_size[0]*2))
+        id = 4*idxy[0] + idxy[1]
+        print(id)
+        if id < 8:
+            if obs_act[id] == 0:
+                obs_act[id] = 1
+            else:
+                if np.sum(obs_act) >= 2:
+                    obs_act[id] = 0
+
+cv2.namedWindow('View')
+cv2.setMouseCallback('View', onMouse)
+
+############ Main ############
 for it, batch in enumerate(data_loader):
     image = batch[0].squeeze(0)
     pose = batch[1].squeeze(0)
@@ -84,56 +103,68 @@ for it, batch in enumerate(data_loader):
     net.construct_scene_representation(x_obs.to(device), v_obs.to(device))
     print(v_obs)
     
+    obs_act = np.array([0]*obs_size)
+    obs_act[0:3] = 1
+
     # Map
     img_map = 0.0*np.ones((map_size+2*fill_size, map_size+2*fill_size,3))
     center_pos = (int(map_size/2+fill_size), int(map_size/2+fill_size))
     cv2.circle(img_map, center_pos, int(map_size/2), (0,1,0), 1)
 
+    # Observation Canvas
     x_obs_canvas = 0.2*np.ones([img_size[0]*2, img_size[1], 3], dtype=np.float32)
-    for i in range(x_obs.shape[0]):
-        osize = (int(img_size[0]/2), int(img_size[1]/2))
-        c = int(255*(0.8/x_obs.shape[0]*i+0.1)) * np.array([1,1], dtype=np.uint8)
-        color =  cv2.applyColorMap(c, cv2.COLORMAP_VIRIDIS)[0,0] / 255.0
-        
-        x_view = cv2.cvtColor(x_obs[i].permute(1,2,0).numpy(), cv2.COLOR_BGR2RGB)
-        x_view = cv2.resize(x_view, osize, interpolation=cv2.INTER_NEAREST)
-        cv2.rectangle(x_view, (0,0), osize, color, 8)
-        text = "Obs" + str(i+1)
-        cv2.putText(x_view, text, (5,20), cv2.FONT_HERSHEY_TRIPLEX , 0.6, color, 1, cv2.LINE_AA)
-        x_obs_canvas[(i%4)*osize[0]:(i%4+1)*osize[0], int(i/4)*osize[1]:int(i/4+1)*osize[1]] = x_view
-        #cv2.imshow("x_obs_"+str(i), x_view)
-        # Draw Map        
-        img_map = draw_camera(img_map, v_obs[i].numpy(), color=color, line_size=line_size, center_line=False)
-
+    
     #cv2.imshow("x_obs", x_obs_canvas)
     query_ang = np.rad2deg(np.arctan2(v_obs[0,1], v_obs[0,0]))
     pos = [np.cos(np.deg2rad(query_ang)), np.sin(np.deg2rad(query_ang))]
     ang = np.deg2rad(180+query_ang)
     step = 0
     while(True):
-        # Query
+        # Query Pose
         print("\r", pos, np.rad2deg(ang), end="")
         v_query = np.array([pos[0], pos[1], 0, np.cos(ang), np.sin(ang), 1, 0])
 
         # Network Forward
         v_query_torch = torch.FloatTensor(v_query).unsqueeze(0)
-        x_query = net.scene_render(v_query_torch.to(device))
+        x_query = net.scene_render(v_query_torch.to(device), obs_act)
         x_query = x_query[0].detach().cpu()
-        
-        x_view = cv2.cvtColor(x_query.permute(1,2,0).numpy(), cv2.COLOR_BGR2RGB)
-        x_view = cv2.resize(x_view, img_size, interpolation=cv2.INTER_NEAREST)
-        cv2.putText(x_view, "Render", (10,24), cv2.FONT_HERSHEY_TRIPLEX , 0.6, (0,0,1), 1, cv2.LINE_AA)
-        cv2.rectangle(x_view, (0,0), img_size, (0,0,1), 12)
-        #cv2.imshow("x_query", x_view)
+        # 
+        x_query_view = cv2.cvtColor(x_query.permute(1,2,0).numpy(), cv2.COLOR_BGR2RGB)
+        x_query_view = cv2.resize(x_query_view, img_size, interpolation=cv2.INTER_NEAREST)
+        cv2.putText(x_query_view, "Render", (10,24), cv2.FONT_HERSHEY_TRIPLEX , 0.6, (0,0,1), 1, cv2.LINE_AA)
+        cv2.rectangle(x_query_view, (0,0), img_size, (0,0,1), 12)
 
-        img_map_curr = draw_camera(img_map.copy(), v_query, color=(0,0,1))
-        cv2.rectangle(img_map_curr, (0,0), img_size, (0.3,0.3,0.3), 12)
-        cv2.putText(img_map_curr, "Map", (10,25), cv2.FONT_HERSHEY_TRIPLEX , 0.6, (0.3,0.3,0.3), 1, cv2.LINE_AA)
-        #cv2.imshow("map", img_map_curr)
-        view_canvas = cv2.vconcat([x_view.astype(np.float32), img_map_curr.astype(np.float32)])
+        for i in range(x_obs.shape[0]):
+            osize = (int(img_size[0]/2), int(img_size[1]/2))
+            c = int(255*(0.8/x_obs.shape[0]*i+0.1)) * np.array([1,1], dtype=np.uint8)
+            color =  cv2.applyColorMap(c, cv2.COLORMAP_VIRIDIS)[0,0] / 255.0
+                
+            x_obs_view = cv2.cvtColor(x_obs[i].permute(1,2,0).numpy(), cv2.COLOR_BGR2RGB)
+            x_obs_view = cv2.resize(x_obs_view, osize, interpolation=cv2.INTER_NEAREST)
+            if obs_act[i] == 0:
+                x_obs_view *= 0.3
+            cv2.rectangle(x_obs_view, (0,0), osize, color, 8)
+            text = "Obs" + str(i+1)
+            cv2.putText(x_obs_view, text, (5,20), cv2.FONT_HERSHEY_TRIPLEX , 0.6, color, 1, cv2.LINE_AA)
+            x_obs_canvas[(i%4)*osize[0]:(i%4+1)*osize[0], int(i/4)*osize[1]:int(i/4+1)*osize[1]] = x_obs_view
+
+        # Draw Obs Camera
+        img_map_cam = img_map.copy()
+        for i in range(obs_act.shape[0]):
+            c = int(255*(0.8/x_obs.shape[0]*i+0.1)) * np.array([1,1], dtype=np.uint8)
+            color =  cv2.applyColorMap(c, cv2.COLORMAP_VIRIDIS)[0,0] / 255.0
+            if obs_act[i] == 1: 
+                img_map_cam = draw_camera(img_map_cam, v_obs[i].numpy(), color=color, line_size=30, center_line=False)
+        
+        # Draw Query Camers
+        img_map_cam = draw_camera(img_map_cam.copy(), v_query, color=(0,0,1))
+        cv2.rectangle(img_map_cam, (0,0), img_size, (0.4,0.4,0.4), 12)
+        cv2.putText(img_map_cam, "Cam", (10,25), cv2.FONT_HERSHEY_TRIPLEX , 0.6, (0.4,0.4,0.4), 1, cv2.LINE_AA)
+        view_canvas = cv2.vconcat([x_query_view.astype(np.float32), img_map_cam.astype(np.float32)])
         view_canvas = cv2.hconcat([x_obs_canvas, view_canvas])
         cv2.imshow("View", view_canvas)
 
+        # View Control
         if human_control:
             k = cv2.waitKey(0)
             if k == ord('q'):
@@ -155,9 +186,11 @@ for it, batch in enumerate(data_loader):
             query_ang += 2
             pos = [np.cos(np.deg2rad(query_ang)), np.sin(np.deg2rad(query_ang))]
             ang = np.deg2rad(180+query_ang)
-            if step > 181:
+            if step > 180*3+1:#181:
                 break
             k = cv2.waitKey(10)
+            if k == 32:
+                break
             if k == 27:
                 exit()
     print()
