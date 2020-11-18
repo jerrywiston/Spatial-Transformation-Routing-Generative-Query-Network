@@ -65,7 +65,7 @@ class STRN(nn.Module):
         wrd_cell = torch.bmm(view_cell, route.permute(0,2,1))
         return wrd_cell # (-1, csize, n_wrd_cells)
     
-    def query(self, wrd_cell, v, view_size=None, steps=None):
+    def query(self, wrd_cell, v, view_size=None):
         if view_size is None:
             view_size = self.view_size
         relation, activation, wcode = self.transform(v, view_size=view_size)

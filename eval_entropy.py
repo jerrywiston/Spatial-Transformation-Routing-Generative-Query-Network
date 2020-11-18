@@ -140,11 +140,11 @@ else:
 
 ############ Dataset ############
 path = args.data_path
-train_dataset = GqnDatasets(root_dir=path, train=True, fraction=args.frac_train)
+#train_dataset = GqnDatasets(root_dir=path, train=True, fraction=args.frac_train)
 test_dataset = GqnDatasets(root_dir=path, train=False, fraction=args.frac_test)
 print("Data path: %s"%(args.data_path))
 print("Data fraction: %f / %f"%(args.frac_train, args.frac_test))
-print("Train data: ", len(train_dataset))
+#print("Train data: ", len(train_dataset))
 print("Test data: ", len(test_dataset))
 
 ############ Create Folder ############
@@ -180,7 +180,7 @@ def calc_entropy(x):
     entropy = entropy.mean(1)
     return entropy
 
-train_loader = DataLoader(train_dataset, batch_size=1, shuffle=True)
+#train_loader = DataLoader(train_dataset, batch_size=1, shuffle=True)
 test_loader = DataLoader(test_dataset, batch_size=1, shuffle=True)
 
 view_size = (16,16)
@@ -196,8 +196,8 @@ for it, batch in enumerate(data_loader):
     x_np = image[0,0].permute(1,2,0).detach().cpu().numpy()
     x_np = cv2.cvtColor(x_np, cv2.COLOR_BGR2RGB)
     x_np = cv2.resize(x_np, (180,180), interpolation=cv2.INTER_NEAREST)
-    view_cell = net.encoder(x_obs).reshape(-1, args.c, view_size[0]*view_size[1])
-    wrd_cell = net.strn(view_cell, v_obs, view_size=view_size)
+    view_cell = net.encoder(x_obs).reshape(-1, args.c, args.v[0]*args.v[1])
+    wrd_cell = net.strn(view_cell, v_obs, view_size=args.v)
     world_cell_global = wrd_cell.detach().cpu().permute(0,2,1).numpy().reshape(-1,args.c)
 
     scene_cell = sigmoid(world_cell_global)
@@ -207,11 +207,13 @@ for it, batch in enumerate(data_loader):
     print("-----------------")
     entropy = entropy.reshape(50,40,-1)
     entropy = cv2.resize(entropy, (200,160), interpolation=cv2.INTER_NEAREST)
+    #entropy = entropy.reshape(80,50,-1)
+    #entropy = cv2.resize(entropy, (320,200), interpolation=cv2.INTER_NEAREST)
     imC = cv2.applyColorMap((entropy*255).astype(np.uint8), cv2.COLORMAP_JET)      
     cv2.imshow("ent", imC)
     cv2.imshow("img", x_np)
     k = cv2.waitKey(0)
-    for i in range(1,9):
+    for i in range(1,4):
         #i = 0
         x_obs = image[0,i].reshape(-1,3,args.img_size[0],args.img_size[1]).to(device)
         #x_query = image[0,i].reshape(-1,3,args.img_size[0],args.img_size[1]).to(device)
@@ -221,8 +223,8 @@ for it, batch in enumerate(data_loader):
         x_np = cv2.cvtColor(x_np, cv2.COLOR_BGR2RGB)
         x_np = cv2.resize(x_np, (180,180), interpolation=cv2.INTER_NEAREST)
 
-        view_cell = net.encoder(x_obs).reshape(-1, args.c, view_size[0]*view_size[1])
-        wrd_cell = net.strn(view_cell, v_obs, view_size=view_size)
+        view_cell = net.encoder(x_obs).reshape(-1, args.c, args.v[0]*args.v[1])
+        wrd_cell = net.strn(view_cell, v_obs, view_size=args.v)
         relation, activation, wcode = net.strn.transform(v_obs)
         wrd_cell = wrd_cell.detach().cpu().permute(0,2,1).numpy().reshape(-1,args.c)
         wrd_cell_g = world_cell_global + wrd_cell
@@ -232,6 +234,8 @@ for it, batch in enumerate(data_loader):
         print(entropy.mean())
         entropy = entropy.reshape(50,40,-1)
         entropy = cv2.resize(entropy, (200,160), interpolation=cv2.INTER_NEAREST)
+        #entropy = entropy.reshape(80,50,-1)
+        #entropy = cv2.resize(entropy, (320,200), interpolation=cv2.INTER_NEAREST)
         imC = cv2.applyColorMap((entropy*255).astype(np.uint8), cv2.COLORMAP_JET)      
         cv2.imshow("ent"+str(i), imC)
         cv2.imshow("x"+str(i), x_np)
