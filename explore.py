@@ -11,18 +11,22 @@ from torch.utils.data import DataLoader
 from srgqn import SRGQN
 from dataset import GqnDatasets
 
-def draw_camera(img_map, v, color=(1,0,0), fov=50, map_size=240, fill_size=8, line_size=400):
+def draw_camera(img_map, v, color=(1,0,0), fov=50, map_size=240, fill_size=8, line_size=400, center_line=True):
     img_map = cv2.flip(img_map, 0)
     pos = (fill_size+int(map_size/2*(1+v[0])), fill_size+int(map_size/2*(1+v[1])))
     ang = np.arctan2(v[4], v[3])
-    line1 = (int(pos[0] + line_size*np.cos(ang)), int(pos[1] + line_size*np.sin(ang)))
-    line2 = (int(pos[0] + line_size*np.cos(ang+np.deg2rad(fov/2))), int(pos[1] + line_size*np.sin(ang+np.deg2rad(fov/2))))
-    line3 = (int(pos[0] + line_size*np.cos(ang-np.deg2rad(fov/2))), int(pos[1] + line_size*np.sin(ang-np.deg2rad(fov/2))))
+    pts1 = (int(pos[0] + line_size*np.cos(ang)), int(pos[1] + line_size*np.sin(ang)))
+    pts2 = (int(pos[0] + line_size*np.cos(ang+np.deg2rad(fov/2))), int(pos[1] + line_size*np.sin(ang+np.deg2rad(fov/2))))
+    pts3 = (int(pos[0] + line_size*np.cos(ang-np.deg2rad(fov/2))), int(pos[1] + line_size*np.sin(ang-np.deg2rad(fov/2))))
+    
     #
     cv2.circle(img_map, pos, 5, color, 3)
-    cv2.line(img_map, pos, line1, color, 1)
-    cv2.line(img_map, pos, line2, color, 2)
-    cv2.line(img_map, pos, line3, color, 2)
+    if center_line:
+        cv2.line(img_map, pos, pts1, color, 1)
+    else:
+        cv2.line(img_map, pts2, pts3, color, 2)
+    cv2.line(img_map, pos, pts2, color, 2)
+    cv2.line(img_map, pos, pts3, color, 2)
     #
     img_map = cv2.flip(img_map, 0)
     return img_map
@@ -68,8 +72,9 @@ img_size = (256,256)
 fov = 50
 map_size = 240
 fill_size = 8
-line_size = 400
-obs_size = 6
+line_size = 30#400
+obs_size = 8
+human_control = False#True
 
 for it, batch in enumerate(data_loader):
     image = batch[0].squeeze(0)
@@ -87,21 +92,24 @@ for it, batch in enumerate(data_loader):
     x_obs_canvas = 0.2*np.ones([img_size[0]*2, img_size[1], 3], dtype=np.float32)
     for i in range(x_obs.shape[0]):
         osize = (int(img_size[0]/2), int(img_size[1]/2))
-        c = int(255*(1.0/x_obs.shape[0]*i+0.0)) * np.array([1,1], dtype=np.uint8)
+        c = int(255*(0.8/x_obs.shape[0]*i+0.1)) * np.array([1,1], dtype=np.uint8)
         color =  cv2.applyColorMap(c, cv2.COLORMAP_VIRIDIS)[0,0] / 255.0
         
         x_view = cv2.cvtColor(x_obs[i].permute(1,2,0).numpy(), cv2.COLOR_BGR2RGB)
         x_view = cv2.resize(x_view, osize, interpolation=cv2.INTER_NEAREST)
         cv2.rectangle(x_view, (0,0), osize, color, 8)
+        text = "Obs" + str(i+1)
+        cv2.putText(x_view, text, (5,20), cv2.FONT_HERSHEY_TRIPLEX , 0.6, color, 1, cv2.LINE_AA)
         x_obs_canvas[(i%4)*osize[0]:(i%4+1)*osize[0], int(i/4)*osize[1]:int(i/4+1)*osize[1]] = x_view
         #cv2.imshow("x_obs_"+str(i), x_view)
         # Draw Map        
-        img_map = draw_camera(img_map, v_obs[i].numpy(), color=color)
+        img_map = draw_camera(img_map, v_obs[i].numpy(), color=color, line_size=line_size, center_line=False)
 
     #cv2.imshow("x_obs", x_obs_canvas)
     query_ang = np.rad2deg(np.arctan2(v_obs[0,1], v_obs[0,0]))
     pos = [np.cos(np.deg2rad(query_ang)), np.sin(np.deg2rad(query_ang))]
     ang = np.deg2rad(180+query_ang)
+    step = 0
     while(True):
         # Query
         print("\r", pos, np.rad2deg(ang), end="")
@@ -114,40 +122,43 @@ for it, batch in enumerate(data_loader):
         
         x_view = cv2.cvtColor(x_query.permute(1,2,0).numpy(), cv2.COLOR_BGR2RGB)
         x_view = cv2.resize(x_view, img_size, interpolation=cv2.INTER_NEAREST)
+        cv2.putText(x_view, "Render", (10,24), cv2.FONT_HERSHEY_TRIPLEX , 0.6, (0,0,1), 1, cv2.LINE_AA)
         cv2.rectangle(x_view, (0,0), img_size, (0,0,1), 12)
         #cv2.imshow("x_query", x_view)
 
         img_map_curr = draw_camera(img_map.copy(), v_query, color=(0,0,1))
         cv2.rectangle(img_map_curr, (0,0), img_size, (0.3,0.3,0.3), 12)
+        cv2.putText(img_map_curr, "Map", (10,25), cv2.FONT_HERSHEY_TRIPLEX , 0.6, (0.3,0.3,0.3), 1, cv2.LINE_AA)
         #cv2.imshow("map", img_map_curr)
         view_canvas = cv2.vconcat([x_view.astype(np.float32), img_map_curr.astype(np.float32)])
         view_canvas = cv2.hconcat([x_obs_canvas, view_canvas])
         cv2.imshow("View", view_canvas)
 
-        k = cv2.waitKey(0)
-        if k == ord('q'):
-            query_ang -= 2
-            query_ang = query_ang % 360
-            pos = [np.cos(np.deg2rad(query_ang)), np.sin(np.deg2rad(query_ang))]
-            ang = np.deg2rad(180+query_ang)
-        if k == ord('e'):
+        if human_control:
+            k = cv2.waitKey(0)
+            if k == ord('q'):
+                query_ang -= 2
+                query_ang = query_ang % 360
+                pos = [np.cos(np.deg2rad(query_ang)), np.sin(np.deg2rad(query_ang))]
+                ang = np.deg2rad(180+query_ang)
+            if k == ord('e'):
+                query_ang += 2
+                query_ang = query_ang % 360
+                pos = [np.cos(np.deg2rad(query_ang)), np.sin(np.deg2rad(query_ang))]
+                ang = np.deg2rad(180+query_ang)
+            if k == 32:
+                break
+            if k == 27:
+                exit()
+        else:
+            step += 1
             query_ang += 2
-            query_ang = query_ang % 360
             pos = [np.cos(np.deg2rad(query_ang)), np.sin(np.deg2rad(query_ang))]
             ang = np.deg2rad(180+query_ang)
-        '''
-        if k == ord('a'):
-            pos[0] -= 0.1
-        if k == ord('d'):
-            pos[0] += 0.1
-        if k == ord('s'):
-            pos[1] += 0.1
-        if k == ord('w'):
-            pos[1] -= 0.1
-        '''
-        if k == 32:
-            break
-        if k == 27:
-            exit()
+            if step > 181:
+                break
+            k = cv2.waitKey(10)
+            if k == 27:
+                exit()
     print()
 
