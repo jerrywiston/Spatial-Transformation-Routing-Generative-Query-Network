@@ -84,7 +84,7 @@ net.load_state_dict(torch.load(save_path+"srgqn.pth"))
 net.eval()
 
 ############ Parameters ############
-data_loader = DataLoader(test_dataset, batch_size=1, shuffle=True)
+data_loader = DataLoader(test_dataset, batch_size=1, shuffle=False)
 img_size = (256,256)
 fov = 50
 map_size = 240
@@ -127,12 +127,19 @@ def demo(x_obs, v_obs):
     center_pos = (int(map_size/2+fill_size), int(map_size/2+fill_size))
     cv2.circle(img_map, center_pos, int(map_size/2), (0,1,0), 1)
     
-    #cv2.imshow("x_obs", x_obs_canvas)
+    # Initialize Pose
     query_ang = np.rad2deg(np.arctan2(v_obs[0,1], v_obs[0,0]))
-    ang = np.arctan2(v_obs[0,4], v_obs[0,3])
-    pos = [float(v_obs[0,0].numpy()), float(v_obs[0,1].numpy())]
-    step = 0
+    if human_control:
+        ang = np.arctan2(v_obs[0,4], v_obs[0,3])
+        pos = [float(v_obs[0,0].numpy()), float(v_obs[0,1].numpy())]
+    else:
+        pos = [np.cos(np.deg2rad(query_ang)), np.sin(np.deg2rad(query_ang))]
+        if view_inverse:
+            ang = np.deg2rad(query_ang)
+        else:
+            ang = np.deg2rad(180+query_ang)
     
+    step = 0
     while(True):
         # Query Pose
         v_query = np.array([pos[0], pos[1], 0, np.cos(ang), np.sin(ang), 1, 0])
@@ -266,7 +273,7 @@ for it, batch in enumerate(data_loader):
     image = batch[0].squeeze(0)
     pose = batch[1].squeeze(0)
     for bit in range(image.shape[0]):
-        print("[ Data", it, "| Batch", bit, "]")
+        print("[ Data", it+1, "| Batch", bit+1, "]")
         x_obs = image[bit,:obs_size]
         v_obs = pose[bit,:obs_size].reshape(-1,7)
         demo(x_obs, v_obs)
