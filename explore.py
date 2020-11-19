@@ -38,6 +38,8 @@ def draw_camera(img_map, v, color=(1,0,0), fov=50, map_size=240, fill_size=8, li
 ############ Parameter Parsing ############
 parser = argparse.ArgumentParser()
 parser.add_argument('--path', nargs='?', type=str ,help='Experiment name.')
+parser.add_argument("--view_inverse", help="view inverse", action="store_true")
+parser.add_argument("--human_control", help="human control", action="store_true")
 exp_path = parser.parse_args().path
 save_path = exp_path + "save/"
 args = parse_config.load_eval_config(exp_path)
@@ -77,20 +79,20 @@ fov = 50
 map_size = 240
 fill_size = 8
 obs_size = 8
-human_control = False
-view_inverse = True#False
 demo_loop = 4
-obs_act = np.array([0]*obs_size)
+human_control = parser.parse_args().human_control #True#False
+view_inverse = parser.parse_args().view_inverse #True#False
 
 ############ Events ############
 def onMouse(event, x, y, flags, param):
-    global obs_act, img_size
+    global obs_act, img_size, render
     if event == cv2.EVENT_LBUTTONDOWN:
         #print('\nx = %d, y = %d'%(x, y))
         idxy = (int(x/img_size[1]*2), int(y/img_size[0]*2))
         id = 4*idxy[0] + idxy[1]
         #print(id)
         if id < 8:
+            render = True
             if obs_act[id] == 0:
                 obs_act[id] = 1
             else:
@@ -105,9 +107,7 @@ for it, batch in enumerate(data_loader):
     pose = batch[1].squeeze(0)
     x_obs = image[0,:obs_size]
     v_obs = pose[0,:obs_size].reshape(-1,7)
-    print(v_obs)
-    #x_obs[1] = image[1,1]
-    #v_obs[1] = pose[1,1].reshape(7)
+    #print(v_obs)
     net.construct_scene_representation(x_obs.to(device), v_obs.to(device))
     
     obs_act = np.array([0]*obs_size)
@@ -126,55 +126,60 @@ for it, batch in enumerate(data_loader):
     ang = np.arctan2(v_obs[0,4], v_obs[0,3])
     pos = [float(v_obs[0,0].numpy()), float(v_obs[0,1].numpy())]
     step = 0
+    render = True
     while(True):
         # Query Pose
         v_query = np.array([pos[0], pos[1], 0, np.cos(ang), np.sin(ang), 1, 0])
-        print("\r", v_query, end="")
+        print("\rCamera Pose:", pos, np.rad2deg(ang), end="")
 
         # Network Forward
-        v_query_torch = torch.FloatTensor(v_query).unsqueeze(0)
-        x_query = net.scene_render(v_query_torch.to(device), obs_act)
-        x_query = x_query[0].detach().cpu()
-        # 
-        x_query_view = cv2.cvtColor(x_query.permute(1,2,0).numpy(), cv2.COLOR_BGR2RGB)
-        x_query_view = cv2.resize(x_query_view, img_size, interpolation=cv2.INTER_NEAREST)
-        cv2.putText(x_query_view, "Render", (10,24), cv2.FONT_HERSHEY_TRIPLEX , 0.6, (0,0,1), 1, cv2.LINE_AA)
-        cv2.rectangle(x_query_view, (0,0), img_size, (0,0,1), 12)
+        if render:
+            render = False
+            v_query_torch = torch.FloatTensor(v_query).unsqueeze(0)
+            x_query = net.scene_render(v_query_torch.to(device), obs_act)
+            x_query = x_query[0].detach().cpu()
+            # 
+            x_query_view = cv2.cvtColor(x_query.permute(1,2,0).numpy(), cv2.COLOR_BGR2RGB)
+            x_query_view = cv2.resize(x_query_view, img_size, interpolation=cv2.INTER_NEAREST)
+            cv2.putText(x_query_view, "Render", (10,24), cv2.FONT_HERSHEY_TRIPLEX , 0.6, (0,0,1), 1, cv2.LINE_AA)
+            cv2.rectangle(x_query_view, (0,0), img_size, (0,0,1), 12)
 
-        for i in range(x_obs.shape[0]):
-            osize = (int(img_size[0]/2), int(img_size[1]/2))
-            c = int(255*(0.8/x_obs.shape[0]*i+0.1)) * np.array([1,1], dtype=np.uint8)
-            color =  cv2.applyColorMap(c, cv2.COLORMAP_VIRIDIS)[0,0] / 255.0
-                
-            x_obs_view = cv2.cvtColor(x_obs[i].permute(1,2,0).numpy(), cv2.COLOR_BGR2RGB)
-            x_obs_view = cv2.resize(x_obs_view, osize, interpolation=cv2.INTER_NEAREST)
-            if obs_act[i] == 0:
-                x_obs_view *= 0.3
-            cv2.rectangle(x_obs_view, (0,0), osize, color, 8)
-            text = "Obs" + str(i+1)
-            cv2.putText(x_obs_view, text, (5,20), cv2.FONT_HERSHEY_TRIPLEX , 0.6, color, 1, cv2.LINE_AA)
-            x_obs_canvas[(i%4)*osize[0]:(i%4+1)*osize[0], int(i/4)*osize[1]:int(i/4+1)*osize[1]] = x_obs_view
+            for i in range(x_obs.shape[0]):
+                osize = (int(img_size[0]/2), int(img_size[1]/2))
+                c = int(255*(0.8/x_obs.shape[0]*i+0.1)) * np.array([1,1], dtype=np.uint8)
+                color =  cv2.applyColorMap(c, cv2.COLORMAP_VIRIDIS)[0,0] / 255.0
+                    
+                x_obs_view = cv2.cvtColor(x_obs[i].permute(1,2,0).numpy(), cv2.COLOR_BGR2RGB)
+                x_obs_view = cv2.resize(x_obs_view, osize, interpolation=cv2.INTER_NEAREST)
+                if obs_act[i] == 0:
+                    x_obs_view *= 0.3
+                cv2.rectangle(x_obs_view, (0,0), osize, color, 8)
+                text = "Obs" + str(i+1)
+                cv2.putText(x_obs_view, text, (5,20), cv2.FONT_HERSHEY_TRIPLEX , 0.6, color, 1, cv2.LINE_AA)
+                x_obs_canvas[(i%4)*osize[0]:(i%4+1)*osize[0], int(i/4)*osize[1]:int(i/4+1)*osize[1]] = x_obs_view
 
-        # Draw Obs Camera
-        img_map_cam = img_map.copy()
-        for i in range(obs_act.shape[0]):
-            c = int(255*(0.8/obs_act.shape[0]*i+0.1)) * np.array([1,1], dtype=np.uint8)
-            color =  cv2.applyColorMap(c, cv2.COLORMAP_VIRIDIS)[0,0] / 255.0
-            if obs_act[i] == 1: 
-                img_map_cam = draw_camera(img_map_cam, v_obs[i].numpy(), color=color, line_size=30, center_line=False)
-        
-        # Draw Query Camers
-        img_map_cam = draw_camera(img_map_cam.copy(), v_query, color=(0,0,1))
-        cv2.rectangle(img_map_cam, (0,0), img_size, (0.4,0.4,0.4), 12)
-        cv2.putText(img_map_cam, "Cam", (10,25), cv2.FONT_HERSHEY_TRIPLEX , 0.6, (0.4,0.4,0.4), 1, cv2.LINE_AA)
-        view_canvas = cv2.vconcat([x_query_view.astype(np.float32), img_map_cam.astype(np.float32)])
-        view_canvas = cv2.hconcat([x_obs_canvas, view_canvas])
-        cv2.imshow("View", view_canvas)
+            # Draw Obs Camera
+            img_map_cam = img_map.copy()
+            for i in range(obs_act.shape[0]):
+                c = int(255*(0.8/obs_act.shape[0]*i+0.1)) * np.array([1,1], dtype=np.uint8)
+                color =  cv2.applyColorMap(c, cv2.COLORMAP_VIRIDIS)[0,0] / 255.0
+                if obs_act[i] == 1: 
+                    img_map_cam = draw_camera(img_map_cam, v_obs[i].numpy(), color=color, line_size=30, center_line=False)
+            
+            # Draw Query Camers
+            img_map_cam = draw_camera(img_map_cam.copy(), v_query, color=(0,0,1))
+            cv2.rectangle(img_map_cam, (0,0), img_size, (0.4,0.4,0.4), 12)
+            cv2.putText(img_map_cam, "Cam", (10,25), cv2.FONT_HERSHEY_TRIPLEX , 0.6, (0.4,0.4,0.4), 1, cv2.LINE_AA)
+            view_canvas = cv2.vconcat([x_query_view.astype(np.float32), img_map_cam.astype(np.float32)])
+            view_canvas = cv2.hconcat([x_obs_canvas, view_canvas])
+            cv2.imshow("View", view_canvas)
 
         # View Control
         if human_control:
             k = cv2.waitKey(10)
+            # Ring Control
             if k == ord('z'):
+                render = True
                 query_ang -= 2
                 query_ang = query_ang % 360
                 pos = [np.cos(np.deg2rad(query_ang)), np.sin(np.deg2rad(query_ang))]
@@ -183,6 +188,7 @@ for it, batch in enumerate(data_loader):
                 else:
                     ang = np.deg2rad(180+query_ang)
             if k == ord('c'):
+                render = True
                 query_ang += 2
                 query_ang = query_ang % 360
                 pos = [np.cos(np.deg2rad(query_ang)), np.sin(np.deg2rad(query_ang))]
@@ -190,27 +196,40 @@ for it, batch in enumerate(data_loader):
                     ang = np.deg2rad(query_ang)
                 else:
                     ang = np.deg2rad(180+query_ang)
+            # Move Control
             if k == ord('w'):
+                render = True
                 pos[0] -= np.cos(ang) * 0.05
                 pos[1] -= np.sin(ang) * 0.05
             if k == ord('s'):
+                render = True
                 pos[0] += np.cos(ang) * 0.05
                 pos[1] += np.sin(ang) * 0.05
             if k == ord('q'):
+                render = True
                 ang += np.deg2rad(4)
             if k == ord('e'):
+                render = True
                 ang -= np.deg2rad(4)
             if k == ord('a'):
+                render = True
                 pos[0] += np.sin(ang) * 0.05
                 pos[1] -= np.cos(ang) * 0.05
             if k == ord('d'):
+                render = True
                 pos[0] -= np.sin(ang) * 0.05
                 pos[1] += np.cos(ang) * 0.05
+            # Switch to Observation Camera
             if ord('1') <= k <= ord('8'):
+                render = True
                 cid = int(k - 49) 
                 ang = np.arctan2(v_obs[cid,4], v_obs[cid,3])
                 pos = [float(v_obs[cid,0].numpy()), float(v_obs[cid,1].numpy())]
+            # Re-render
+            if k == 13:
+                render = True
         else:
+            render = True
             step += 1
             query_ang += 2
             pos = [np.cos(np.deg2rad(query_ang)), np.sin(np.deg2rad(query_ang))]
