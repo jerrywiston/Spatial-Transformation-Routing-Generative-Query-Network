@@ -201,7 +201,7 @@ for it, batch in enumerate(data_loader):
     world_cell_global = wrd_cell.detach().cpu().permute(0,2,1).numpy().reshape(-1,args.c)
 
     scene_cell = sigmoid(world_cell_global)
-    entropy = calc_entropy(scene_cell)
+    entropy = scene_cell[:,1]#calc_entropy(scene_cell)
     print("=================")
     print(entropy.mean())
     print("-----------------")
@@ -213,8 +213,8 @@ for it, batch in enumerate(data_loader):
     cv2.imshow("ent", imC)
     cv2.imshow("img", x_np)
     k = cv2.waitKey(0)
-    for i in range(1,4):
-        #i = 0
+    for i in range(1,8):
+        i = 0
         x_obs = image[0,i].reshape(-1,3,args.img_size[0],args.img_size[1]).to(device)
         #x_query = image[0,i].reshape(-1,3,args.img_size[0],args.img_size[1]).to(device)
         v_obs = pose[0,i].reshape(-1,7).to(device)
@@ -227,10 +227,11 @@ for it, batch in enumerate(data_loader):
         wrd_cell = net.strn(view_cell, v_obs, view_size=args.v)
         relation, activation, wcode = net.strn.transform(v_obs)
         wrd_cell = wrd_cell.detach().cpu().permute(0,2,1).numpy().reshape(-1,args.c)
-        wrd_cell_g = world_cell_global + wrd_cell
+        world_cell_global += wrd_cell
+        wrd_cell_g = world_cell_global
         
         scene_cell = sigmoid(wrd_cell_g)
-        entropy = calc_entropy(scene_cell)
+        entropy = scene_cell[:,1]#calc_entropy(scene_cell)
         print(entropy.mean())
         entropy = entropy.reshape(50,40,-1)
         entropy = cv2.resize(entropy, (200,160), interpolation=cv2.INTER_NEAREST)

@@ -10,11 +10,15 @@ from torch.utils.data import DataLoader
 
 from srgqn import SRGQN
 from dataset import GqnDatasets
+np.set_printoptions(precision=3)
 
 def draw_camera(img_map, v, color=(1,0,0), fov=50, map_size=240, fill_size=8, line_size=400, center_line=True):
+    global view_inverse
     img_map = cv2.flip(img_map, 0)
     pos = (fill_size+int(map_size/2*(1+v[0])), fill_size+int(map_size/2*(1+v[1])))
     ang = np.arctan2(v[4], v[3])
+    if view_inverse:
+        ang += np.pi
     pts1 = (int(pos[0] + line_size*np.cos(ang)), int(pos[1] + line_size*np.sin(ang)))
     pts2 = (int(pos[0] + line_size*np.cos(ang+np.deg2rad(fov/2))), int(pos[1] + line_size*np.sin(ang+np.deg2rad(fov/2))))
     pts3 = (int(pos[0] + line_size*np.cos(ang-np.deg2rad(fov/2))), int(pos[1] + line_size*np.sin(ang-np.deg2rad(fov/2))))
@@ -67,13 +71,15 @@ net.load_state_dict(torch.load(save_path+"srgqn.pth"))
 net.eval()
 
 ############ Parameters ############
-data_loader = DataLoader(test_dataset, batch_size=1, shuffle=False)
+data_loader = DataLoader(test_dataset, batch_size=1, shuffle=True)
 img_size = (256,256)
 fov = 50
 map_size = 240
 fill_size = 8
 obs_size = 8
-human_control = False#True
+human_control = True
+view_inverse = True#False
+demo_loop = 4
 obs_act = np.array([0]*obs_size)
 
 ############ Events ############
@@ -83,13 +89,12 @@ def onMouse(event, x, y, flags, param):
         #print('\nx = %d, y = %d'%(x, y))
         idxy = (int(x/img_size[1]*2), int(y/img_size[0]*2))
         id = 4*idxy[0] + idxy[1]
-        print(id)
+        #print(id)
         if id < 8:
             if obs_act[id] == 0:
                 obs_act[id] = 1
             else:
-                if np.sum(obs_act) >= 2:
-                    obs_act[id] = 0
+                obs_act[id] = 0
 
 cv2.namedWindow('View')
 cv2.setMouseCallback('View', onMouse)
@@ -100,8 +105,10 @@ for it, batch in enumerate(data_loader):
     pose = batch[1].squeeze(0)
     x_obs = image[0,:obs_size]
     v_obs = pose[0,:obs_size].reshape(-1,7)
-    net.construct_scene_representation(x_obs.to(device), v_obs.to(device))
     print(v_obs)
+    #x_obs[1] = image[1,1]
+    #v_obs[1] = pose[1,1].reshape(7)
+    net.construct_scene_representation(x_obs.to(device), v_obs.to(device))
     
     obs_act = np.array([0]*obs_size)
     obs_act[0:3] = 1
@@ -117,12 +124,15 @@ for it, batch in enumerate(data_loader):
     #cv2.imshow("x_obs", x_obs_canvas)
     query_ang = np.rad2deg(np.arctan2(v_obs[0,1], v_obs[0,0]))
     pos = [np.cos(np.deg2rad(query_ang)), np.sin(np.deg2rad(query_ang))]
-    ang = np.deg2rad(180+query_ang)
+    if view_inverse:
+        ang = np.deg2rad(query_ang)
+    else:
+        ang = np.deg2rad(180+query_ang)
     step = 0
     while(True):
         # Query Pose
-        print("\r", pos, np.rad2deg(ang), end="")
         v_query = np.array([pos[0], pos[1], 0, np.cos(ang), np.sin(ang), 1, 0])
+        print("\r", v_query, end="")
 
         # Network Forward
         v_query_torch = torch.FloatTensor(v_query).unsqueeze(0)
@@ -151,7 +161,7 @@ for it, batch in enumerate(data_loader):
         # Draw Obs Camera
         img_map_cam = img_map.copy()
         for i in range(obs_act.shape[0]):
-            c = int(255*(0.8/x_obs.shape[0]*i+0.1)) * np.array([1,1], dtype=np.uint8)
+            c = int(255*(0.8/obs_act.shape[0]*i+0.1)) * np.array([1,1], dtype=np.uint8)
             color =  cv2.applyColorMap(c, cv2.COLORMAP_VIRIDIS)[0,0] / 255.0
             if obs_act[i] == 1: 
                 img_map_cam = draw_camera(img_map_cam, v_obs[i].numpy(), color=color, line_size=30, center_line=False)
@@ -166,32 +176,54 @@ for it, batch in enumerate(data_loader):
 
         # View Control
         if human_control:
-            k = cv2.waitKey(0)
-            if k == ord('q'):
+            k = cv2.waitKey(10)
+            if k == ord('z'):
                 query_ang -= 2
                 query_ang = query_ang % 360
                 pos = [np.cos(np.deg2rad(query_ang)), np.sin(np.deg2rad(query_ang))]
-                ang = np.deg2rad(180+query_ang)
-            if k == ord('e'):
+                if view_inverse:
+                    ang = np.deg2rad(query_ang)
+                else:
+                    ang = np.deg2rad(180+query_ang)
+            if k == ord('c'):
                 query_ang += 2
                 query_ang = query_ang % 360
                 pos = [np.cos(np.deg2rad(query_ang)), np.sin(np.deg2rad(query_ang))]
-                ang = np.deg2rad(180+query_ang)
-            if k == 32:
-                break
-            if k == 27:
-                exit()
+                if view_inverse:
+                    ang = np.deg2rad(query_ang)
+                else:
+                    ang = np.deg2rad(180+query_ang)
+            if k == ord('w'):
+                pos[0] -= np.cos(ang) * 0.05
+                pos[1] -= np.sin(ang) * 0.05
+            if k == ord('s'):
+                pos[0] += np.cos(ang) * 0.05
+                pos[1] += np.sin(ang) * 0.05
+            if k == ord('q'):
+                ang += np.deg2rad(4)
+            if k == ord('e'):
+                ang -= np.deg2rad(4)
+            if k == ord('a'):
+                pos[0] += np.sin(ang) * 0.05
+                pos[1] -= np.cos(ang) * 0.05
+            if k == ord('d'):
+                pos[0] -= np.sin(ang) * 0.05
+                pos[1] += np.cos(ang) * 0.05
         else:
             step += 1
             query_ang += 2
             pos = [np.cos(np.deg2rad(query_ang)), np.sin(np.deg2rad(query_ang))]
-            ang = np.deg2rad(180+query_ang)
-            if step > 180*3+1:#181:
+            if view_inverse:
+                ang = np.deg2rad(query_ang)
+            else:
+                ang = np.deg2rad(180+query_ang)
+            if step > 180*demo_loop+1:
                 break
             k = cv2.waitKey(10)
-            if k == 32:
-                break
-            if k == 27:
-                exit()
+        
+        if k == 32:
+            break
+        if k == 27:
+            exit()
     print()
 
