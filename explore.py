@@ -1,3 +1,15 @@
+###########################################
+#      Keyboard Control Instruction       #
+#-----------------------------------------#
+# R: Switch <Auto Demo>/<Human Control>.  #
+# W/A/S/D: Move.                          #
+# Q/E: Turn perspective.                  #
+# Z/C: Around the ring.                   #
+# 1~8: Move to observation pose.          #
+# SPACE: Next data.                       #
+# ENTER: Re-render the canvas.            # 
+###########################################
+
 import numpy as np
 import cv2
 import argparse
@@ -104,7 +116,7 @@ cv2.setMouseCallback('View', onMouse)
 
 ############ Main ############
 def demo(x_obs, v_obs):
-    global human_control, render, obs_act
+    global human_control, render, obs_act, demo_loop
     render = True
     net.construct_scene_representation(x_obs.to(device), v_obs.to(device))
     obs_act = np.array([0]*obs_size)
@@ -124,7 +136,7 @@ def demo(x_obs, v_obs):
     while(True):
         # Query Pose
         v_query = np.array([pos[0], pos[1], 0, np.cos(ang), np.sin(ang), 1, 0])
-        print("\rCamera Pose:", pos, np.rad2deg(ang), end="")
+        print("\rStep:", str(step).zfill(3), "/", 180*demo_loop+1 ,", Camera Pose:", pos, np.rad2deg(ang), end="")
 
         # Network Forward
         if render:
@@ -254,7 +266,7 @@ for it, batch in enumerate(data_loader):
     image = batch[0].squeeze(0)
     pose = batch[1].squeeze(0)
     for bit in range(image.shape[0]):
-        print("Data:", it, "Batch:", bit)
+        print("[ Data", it, "| Batch", bit, "]")
         x_obs = image[bit,:obs_size]
         v_obs = pose[bit,:obs_size].reshape(-1,7)
         demo(x_obs, v_obs)
