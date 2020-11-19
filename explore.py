@@ -77,7 +77,7 @@ fov = 50
 map_size = 240
 fill_size = 8
 obs_size = 8
-human_control = True
+human_control = False
 view_inverse = True#False
 demo_loop = 4
 obs_act = np.array([0]*obs_size)
@@ -123,11 +123,8 @@ for it, batch in enumerate(data_loader):
     
     #cv2.imshow("x_obs", x_obs_canvas)
     query_ang = np.rad2deg(np.arctan2(v_obs[0,1], v_obs[0,0]))
-    pos = [np.cos(np.deg2rad(query_ang)), np.sin(np.deg2rad(query_ang))]
-    if view_inverse:
-        ang = np.deg2rad(query_ang)
-    else:
-        ang = np.deg2rad(180+query_ang)
+    ang = np.arctan2(v_obs[0,4], v_obs[0,3])
+    pos = [float(v_obs[0,0].numpy()), float(v_obs[0,1].numpy())]
     step = 0
     while(True):
         # Query Pose
@@ -209,6 +206,10 @@ for it, batch in enumerate(data_loader):
             if k == ord('d'):
                 pos[0] -= np.sin(ang) * 0.05
                 pos[1] += np.cos(ang) * 0.05
+            if ord('1') <= k <= ord('8'):
+                cid = int(k - 49) 
+                ang = np.arctan2(v_obs[cid,4], v_obs[cid,3])
+                pos = [float(v_obs[cid,0].numpy()), float(v_obs[cid,1].numpy())]
         else:
             step += 1
             query_ang += 2
