@@ -59,7 +59,6 @@ else:
 
 ############ Dataset ############
 path = args.data_path
-#train_dataset = GqnDatasets(root_dir=path, train=True, fraction=args.frac_train)
 test_dataset = GqnDatasets(root_dir=path, train=False, fraction=args.frac_test)
 print("Data path: %s"%(args.data_path))
 print("Data fraction: %f / %f"%(args.frac_train, args.frac_test))
@@ -82,6 +81,7 @@ obs_size = 8
 demo_loop = 4
 human_control = parser.parse_args().human_control #True#False
 view_inverse = parser.parse_args().view_inverse #True#False
+render = True
 
 ############ Events ############
 def onMouse(event, x, y, flags, param):
@@ -97,19 +97,16 @@ def onMouse(event, x, y, flags, param):
                 obs_act[id] = 1
             else:
                 obs_act[id] = 0
+            #print(obs_act)
 
 cv2.namedWindow('View')
 cv2.setMouseCallback('View', onMouse)
 
 ############ Main ############
-for it, batch in enumerate(data_loader):
-    image = batch[0].squeeze(0)
-    pose = batch[1].squeeze(0)
-    x_obs = image[0,:obs_size]
-    v_obs = pose[0,:obs_size].reshape(-1,7)
-    #print(v_obs)
+def demo(x_obs, v_obs):
+    global human_control, render, obs_act
+    render = True
     net.construct_scene_representation(x_obs.to(device), v_obs.to(device))
-    
     obs_act = np.array([0]*obs_size)
     obs_act[0:3] = 1
 
@@ -117,16 +114,13 @@ for it, batch in enumerate(data_loader):
     img_map = 0.0*np.ones((map_size+2*fill_size, map_size+2*fill_size,3))
     center_pos = (int(map_size/2+fill_size), int(map_size/2+fill_size))
     cv2.circle(img_map, center_pos, int(map_size/2), (0,1,0), 1)
-
-    # Observation Canvas
-    x_obs_canvas = 0.2*np.ones([img_size[0]*2, img_size[1], 3], dtype=np.float32)
     
     #cv2.imshow("x_obs", x_obs_canvas)
     query_ang = np.rad2deg(np.arctan2(v_obs[0,1], v_obs[0,0]))
     ang = np.arctan2(v_obs[0,4], v_obs[0,3])
     pos = [float(v_obs[0,0].numpy()), float(v_obs[0,1].numpy())]
     step = 0
-    render = True
+    
     while(True):
         # Query Pose
         v_query = np.array([pos[0], pos[1], 0, np.cos(ang), np.sin(ang), 1, 0])
@@ -144,6 +138,7 @@ for it, batch in enumerate(data_loader):
             cv2.putText(x_query_view, "Render", (10,24), cv2.FONT_HERSHEY_TRIPLEX , 0.6, (0,0,1), 1, cv2.LINE_AA)
             cv2.rectangle(x_query_view, (0,0), img_size, (0,0,1), 12)
 
+            x_obs_canvas = 0.2*np.ones([img_size[0]*2, img_size[1], 3], dtype=np.float32)
             for i in range(x_obs.shape[0]):
                 osize = (int(img_size[0]/2), int(img_size[1]/2))
                 c = int(255*(0.8/x_obs.shape[0]*i+0.1)) * np.array([1,1], dtype=np.uint8)
@@ -152,7 +147,7 @@ for it, batch in enumerate(data_loader):
                 x_obs_view = cv2.cvtColor(x_obs[i].permute(1,2,0).numpy(), cv2.COLOR_BGR2RGB)
                 x_obs_view = cv2.resize(x_obs_view, osize, interpolation=cv2.INTER_NEAREST)
                 if obs_act[i] == 0:
-                    x_obs_view *= 0.3
+                    x_obs_view *= 0.2
                 cv2.rectangle(x_obs_view, (0,0), osize, color, 8)
                 text = "Obs" + str(i+1)
                 cv2.putText(x_obs_view, text, (5,20), cv2.FONT_HERSHEY_TRIPLEX , 0.6, color, 1, cv2.LINE_AA)
@@ -228,6 +223,9 @@ for it, batch in enumerate(data_loader):
             # Re-render
             if k == 13:
                 render = True
+            # Swith Human Control / Ring Demo
+            if k == ord('r'):
+                human_control = False
         else:
             render = True
             step += 1
@@ -240,10 +238,23 @@ for it, batch in enumerate(data_loader):
             if step > 180*demo_loop+1:
                 break
             k = cv2.waitKey(10)
-        
+            # Swith Human Control / Ring Demo
+            if k == ord('r'):
+                human_control = True
+        # Next / Break
         if k == 32:
             break
         if k == 27:
             exit()
     print()
 
+obs_act = np.array([0]*obs_size)
+obs_act[0:3] = 1
+for it, batch in enumerate(data_loader):
+    image = batch[0].squeeze(0)
+    pose = batch[1].squeeze(0)
+    for bit in range(image.shape[0]):
+        print("Data:", it, "Batch:", bit)
+        x_obs = image[bit,:obs_size]
+        v_obs = pose[bit,:obs_size].reshape(-1,7)
+        demo(x_obs, v_obs)
