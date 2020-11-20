@@ -228,15 +228,13 @@ for it, batch in enumerate(data_loader):
     view_cell_sim = hp / np.max(hp) * 1.5 #np.log(hp/(1-hp)+1e-10)
     #print(view_cell_sim.max(), view_cell_sim.min())
     view_cell_torch = torch.FloatTensor(view_cell_sim).reshape(1,feat_size,feat_size,args.c).permute(0,3,1,2).to(device)
-    rlist = []
-    for j in range(1,6):
-        routing = net.visualize_routing(view_cell_torch, v_obs, v_query, None, view_size=(feat_size, feat_size))
-        routing = routing.permute(0,2,3,1).detach().cpu().reshape(feat_size,feat_size,args.c).numpy()
-        rlist.append(routing)
+
+    routing = net.visualize_routing(view_cell_torch, v_obs, v_query, view_size=(feat_size, feat_size))
+    routing = routing.permute(0,2,3,1).detach().cpu().reshape(feat_size,feat_size,args.c).numpy()
 
     img_size = (128,128)
     signal_obs = cv2.resize(view_cell_sim[:,:,0:3], img_size, interpolation=cv2.INTER_NEAREST)
-    signal_query = cv2.resize(rlist[3][:,:,0:3], img_size, interpolation=cv2.INTER_NEAREST)
+    signal_query = cv2.resize(routing[:,:,0:3], img_size, interpolation=cv2.INTER_NEAREST)
     #print(np.max(signal_query))
     signal_query = np.minimum(5*signal_query, 1.0)
     x_obs = cv2.cvtColor(x_obs, cv2.COLOR_BGR2RGB)
@@ -365,7 +363,7 @@ for it, batch in enumerate(data_loader):
     print("Line:", line)
     print(np.rad2deg(np.arctan2(line[0,1],line[0,0])))
 
-    epi_img2 = 4*rlist[3][:,:,0:3]
+    epi_img2 = 4*routing[:,:,0:3]
     #epi_img2 = np.zeros((feat_size, feat_size, 3), dtype=np.float32)
     epi_img2 = drawlines(epi_img2,line,pts)
     epi_img2 = cv2.resize(epi_img2, img_size, interpolation=cv2.INTER_NEAREST)
