@@ -104,10 +104,11 @@ human_control = parser.parse_args().human_control #True#False
 view_inverse = parser.parse_args().view_inverse #True#False
 render = True
 signal_pos = None
+feat_size = 16
 
 ############ Events ############
 def onMouse(event, x, y, flags, param):
-    global obs_act, img_size, render, signal_pos
+    global obs_act, img_size, render, signal_pos, feat_size
     obs_size = (int(img_size[0]/2), int(img_size[1]/2))
     if event == cv2.EVENT_LBUTTONDOWN:
         idxy = (int(x/obs_size[1]), int(y/obs_size[0]))
@@ -132,13 +133,25 @@ def onMouse(event, x, y, flags, param):
             print(x_local_norm, y_local_norm, id)
             signal_pos = {"global":(x,y), "local":(x_local_norm, y_local_norm), "id":id}
             render = True
+    if event == cv2.EVENT_MOUSEWHEEL:
+        if flags > 0:
+            #print("up")
+            if feat_size < 64:
+                feat_size *= 2
+                render = True
+        else:
+            #print("down")
+            if feat_size > 8:
+                feat_size = int(feat_size/2)
+                render = True
+            
 
 cv2.namedWindow('View')
 cv2.setMouseCallback('View', onMouse)
 
 ############ Main ############
 def demo(x_obs, v_obs):
-    global human_control, render, obs_act, demo_loop, signal_pos
+    global human_control, render, obs_act, demo_loop, signal_pos, feat_size
     render = True
     x_obs_torch = x_obs.to(device)
     v_obs_torch = v_obs.to(device)
@@ -181,15 +194,14 @@ def demo(x_obs, v_obs):
             
             # Draw Signal
             if signal_pos is not None:
-                feat_size = 16
                 std = 0.05
                 hp = gaussian_heatmap(signal_pos["local"], std, (feat_size,feat_size,args.c))
-                view_cell_sim = hp / np.max(hp) * 20# 1.5
+                view_cell_sim = hp / np.max(hp) * 30
                 view_cell_torch = torch.FloatTensor(view_cell_sim).reshape(1,feat_size,feat_size,args.c).permute(0,3,1,2).to(device)
                 routing = net.visualize_routing(view_cell_torch, v_obs_torch[signal_pos["id"]].unsqueeze(0), v_query_torch.to(device), view_size=(feat_size, feat_size))
                 routing = routing.permute(0,2,3,1).detach().cpu().reshape(feat_size,feat_size,args.c).numpy()[:,:,0:3]
                 signal_query = cv2.resize(routing, img_size, interpolation=cv2.INTER_NEAREST)
-                x_query_view = x_query_view * (signal_query*0.7+0.3)
+                x_query_view = x_query_view * (signal_query*0.75+0.25)
 
             # Draw Query Image
             cv2.putText(x_query_view, "Render", (10,24), cv2.FONT_HERSHEY_TRIPLEX , 0.6, (0,0,1), 1, cv2.LINE_AA)
