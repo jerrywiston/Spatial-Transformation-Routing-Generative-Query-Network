@@ -59,8 +59,8 @@ def gaussian_heatmap(mean, std, size):
 ############ Parameter Parsing ############
 parser = argparse.ArgumentParser()
 parser.add_argument('--path', nargs='?', type=str ,help='Experiment name.')
-parser.add_argument("--view_inverse", help="view inverse", action="store_true")
-parser.add_argument("--human_control", help="human control", action="store_true")
+parser.add_argument("-i", "--view_inverse", help="view inverse", action="store_true")
+parser.add_argument("-k", "--keyboard", help="human control", action="store_true")
 exp_path = parser.parse_args().path
 save_path = exp_path + "save/"
 args = parse_config.load_eval_config(exp_path)
@@ -99,11 +99,12 @@ fov = 50
 map_size = 240
 fill_size = 8
 obs_size = 8
-demo_loop = 4
-human_control = parser.parse_args().human_control #True#False
+demo_loop = 2
+human_control = parser.parse_args().keyboard #True#False
 view_inverse = parser.parse_args().view_inverse #True#False
 render = True
 signal_pos = None
+obs_increase = False
 feat_size = 16
 
 ############ Events ############
@@ -145,19 +146,18 @@ def onMouse(event, x, y, flags, param):
                 feat_size = int(feat_size/2)
                 render = True
             
-
 cv2.namedWindow('View')
 cv2.setMouseCallback('View', onMouse)
 
 ############ Main ############
 def demo(x_obs, v_obs):
-    global human_control, render, obs_act, demo_loop, signal_pos, feat_size
+    global human_control, render, obs_act, demo_loop, signal_pos, feat_size, ent_queue
     render = True
     x_obs_torch = x_obs.to(device)
     v_obs_torch = v_obs.to(device)
     net.construct_scene_representation(x_obs_torch, v_obs_torch)
     obs_act = np.array([0]*obs_size)
-    obs_act[0:3] = 1
+    obs_act[0:1] = 1
 
     # Map
     img_map = 0.0*np.ones((map_size+2*fill_size, map_size+2*fill_size,3))
@@ -194,9 +194,9 @@ def demo(x_obs, v_obs):
             
             # Draw Signal
             if signal_pos is not None:
-                std = 0.05
+                std = 0.04
                 hp = gaussian_heatmap(signal_pos["local"], std, (feat_size,feat_size,args.c))
-                view_cell_sim = hp / np.max(hp) * 30
+                view_cell_sim = hp / np.max(hp) * 50
                 view_cell_torch = torch.FloatTensor(view_cell_sim).reshape(1,feat_size,feat_size,args.c).permute(0,3,1,2).to(device)
                 routing = net.visualize_routing(view_cell_torch, v_obs_torch[signal_pos["id"]].unsqueeze(0), v_query_torch.to(device), view_size=(feat_size, feat_size))
                 routing = routing.permute(0,2,3,1).detach().cpu().reshape(feat_size,feat_size,args.c).numpy()[:,:,0:3]
@@ -204,7 +204,12 @@ def demo(x_obs, v_obs):
                 x_query_view = x_query_view * (signal_query*0.75+0.25)
 
             # Draw Query Image
-            cv2.putText(x_query_view, "Render", (10,24), cv2.FONT_HERSHEY_TRIPLEX , 0.6, (0,0,1), 1, cv2.LINE_AA)
+            ren_text = "Render"
+            if signal_pos is None:
+                ren_text = "Render"
+            else:
+                ren_text = "Query Signal " + str(feat_size) + "x" + str(feat_size)
+            cv2.putText(x_query_view, ren_text, (10,24), cv2.FONT_HERSHEY_TRIPLEX , 0.6, (0,0,1), 1, cv2.LINE_AA)
             cv2.rectangle(x_query_view, (0,0), img_size, (0,0,1), 12)
 
             # Draw Observation Images
@@ -310,7 +315,13 @@ def demo(x_obs, v_obs):
                 ang = np.deg2rad(180+query_ang)
             if step > 180*demo_loop+1:
                 break
-            k = cv2.waitKey(10)
+            if obs_increase:
+                progress = int(step / (180*demo_loop) * 8)
+                #print(progress)
+                for i in range(len(obs_act)):
+                    if i <= progress:
+                        obs_act[i] = 1
+            k = cv2.waitKey(1)
             # Swith Human Control / Ring Demo
             if k == ord('r'):
                 human_control = True
@@ -326,11 +337,14 @@ def demo(x_obs, v_obs):
 
 obs_act = np.array([0]*obs_size)
 obs_act[0:3] = 1
+#print("[ Press any button to start ]")
+#cv2.waitKey(0)
 for it, batch in enumerate(data_loader):
     image = batch[0].squeeze(0)
-    pose = batch[1].squeeze(0)
+    pose = batch[1].squeeze(0)    
     for bit in range(image.shape[0]):
         print("[ Data", it+1, "| Batch", bit+1, "]")
         x_obs = image[bit,:obs_size]
         v_obs = pose[bit,:obs_size].reshape(-1,7)
         demo(x_obs, v_obs)
+    break

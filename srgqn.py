@@ -108,5 +108,8 @@ class SRGQN(nn.Module):
                 self.scene_cell_record += self.wrd_cell_record[i:i+1]
         self.scene_cell_record = torch.sigmoid(self.scene_cell_record)
         sample_size = (self.view_size[0]*self.down_size, self.view_size[1]*self.down_size)
-        x_query = self.step_query_view_sample(self.scene_cell_record, vq)
+        view_cell_query = self.strn.query(self.scene_cell_record, vq)
+        sample_size = (self.view_size[0]*self.down_size, self.view_size[1]*self.down_size)
+        x_query = self.generator.sample(sample_size, view_cell_query)
+        #
         return x_query
