@@ -129,7 +129,7 @@ class GeneratorNetwork(nn.Module):
         x_mu = self.observation_density(u)
         return torch.sigmoid(x_mu), kl
 
-    def sample(self, x_shape, r):
+    def sample(self, x_shape, r, noise=False):
         """
         Sample from the prior distribution to generate
         a new image given a viewpoint and representation
@@ -150,7 +150,10 @@ class GeneratorNetwork(nn.Module):
             prior_distribution = Normal(p_mu, F.softplus(p_log_std))
 
             # Prior sample
-            z = prior_distribution.sample()
+            if noise:
+                z = prior_distribution.sample()
+            else:
+                z = p_mu
 
             # Calculate u
             generator = self.generator_core if self.share else self.generator_core[l]
@@ -160,3 +163,4 @@ class GeneratorNetwork(nn.Module):
         x_mu = self.observation_density(u)
         
         return torch.sigmoid(x_mu)
+    

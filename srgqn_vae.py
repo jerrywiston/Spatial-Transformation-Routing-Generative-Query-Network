@@ -91,3 +91,22 @@ class SRGQN(nn.Module):
         view_cell_mask = random_mask * view_cell
         x_rec, kl = self.generator(x, view_cell_mask)
         return x_rec, kl
+
+    #############################
+    # Demo
+    #############################
+    def construct_scene_representation(self, x, v):
+        self.wrd_cell_record = self.step_observation_encode(x, v)
+        self.scene_cell_record = torch.sigmoid(torch.sum(self.wrd_cell_record, 0, keepdim=True))
+
+    def scene_render(self, vq, obs_act=None, noise=False):
+        with torch.no_grad():
+            obs_act_ts = torch.FloatTensor(obs_act).to(device).reshape(-1,1,1)
+            self.scene_cell_record = (self.wrd_cell_record * obs_act_ts)
+            self.scene_cell_record = torch.sum(self.scene_cell_record, 0, keepdim=True)
+            self.scene_cell_record = torch.sigmoid(self.scene_cell_record)
+            sample_size = (self.view_size[0]*self.down_size, self.view_size[1]*self.down_size)
+            view_cell_query = self.strn.query(self.scene_cell_record, vq)
+            sample_size = (self.view_size[0]*self.down_size, self.view_size[1]*self.down_size)
+            x_query = self.generator.sample(sample_size, view_cell_query)
+        return x_query

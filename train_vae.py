@@ -171,7 +171,7 @@ net = SRGQN(n_wrd_cells=args.w, view_size=args.v, csize=args.c, ch=args.ch, vsiz
     draw_layers=args.draw_layers, down_size=args.down_size, share_core=args.share_core).to(device)
 params = list(net.parameters())
 opt = optim.Adam(params, lr=5e-5, betas=(0.5, 0.999))
-
+net.load_state_dict(torch.load("experiments/2020-11-21_rfc_no_rot_w2000_c128/save/srgqn.pth"))
 ############ Training ############
 max_obs_size = args.max_obs_size
 total_steps = args.total_steps

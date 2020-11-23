@@ -136,8 +136,10 @@ class GeneratorNetwork(nn.Module):
         x_rec = self.dec(z,r)
         return x_rec, kl
 
-    def sample(self, x_shape, r):
+    def sample(self, x_shape, r, noise=False):
         z_rand = torch.randn(r.size(0), self.z_dim, device=device)
+        if not noise:
+            z_rand *= 0
         x_samp = self.dec(z_rand,r)
         return x_samp
 

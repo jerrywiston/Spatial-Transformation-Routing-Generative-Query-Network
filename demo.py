@@ -21,7 +21,8 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 
-from srgqn import SRGQN
+#from srgqn import SRGQN
+from srgqn_vae import SRGQN
 from dataset import GqnDatasets
 np.set_printoptions(precision=3)
 
@@ -89,6 +90,7 @@ parser.add_argument("-k", "--keyboard", help="human control", action="store_true
 parser.add_argument("-demo1", "--obs_demo", help="Observation demo", action="store_true")
 parser.add_argument("-demo2", "--signal_demo", help="Signal demo", action="store_true")
 parser.add_argument("-s", "--save_video", help="Save video", action="store_true")
+parser.add_argument("-n", "--noise", help="Apply noise", action="store_true")
 parser.add_argument('--obs', nargs='?', type=int, default=4, help='Initial number of observations.')
 parser.add_argument('--round', nargs='?', type=int, default=2, help='Number of round per scene.')
 parser.add_argument('--signal', nargs='?', type=int, default=40, help='Amplitude of signal.')
@@ -137,6 +139,7 @@ obs_demo = parser.parse_args().obs_demo
 signal_demo = parser.parse_args().signal_demo
 obs_init = parser.parse_args().obs
 save_video = parser.parse_args().save_video
+noise = parser.parse_args().noise
 render = True
 signal_pos = {"global":(int(img_size[1]/2*0.5),int(img_size[0]/2*0.7)), "local":(0.5, 0.7), "id":0}#None
 signal_amp = parser.parse_args().signal
@@ -216,11 +219,9 @@ def demo(x_obs, v_obs, write_path=None):
             ang = np.deg2rad(query_ang)
         else:
             ang = np.deg2rad(180+query_ang)
-    
     step = 0
     while(True):
         # Query Pose
-        v_query = np.array([pos[0], pos[1], 0, np.cos(ang), np.sin(ang), 1, 0])
         print("\rStep:", str(step+1).zfill(3), "/", 180*demo_loop ,", Camera Pose:", pos, np.rad2deg(ang), end="")
 
         ########################################################
@@ -278,6 +279,7 @@ def demo(x_obs, v_obs, write_path=None):
             # Swith Human Control / Ring Demo
             if k == ord('r'):
                 human_control = False
+            
         else:
             render = True
             query_ang += 2
@@ -298,8 +300,8 @@ def demo(x_obs, v_obs, write_path=None):
                         obs_act[i] = 0
                 signal_pos = {"global":local2global(progress, (0.5,0.7)), "local":(0.5, 0.7), "id":progress}
             if signal_demo:
-                progress = int(step / (180*demo_loop) * 8)
-                progress2 = int(step / (180*demo_loop) * 24)
+                progress = int(step / (180*demo_loop) * 4)
+                progress2 = int(step / (180*demo_loop) * 12)
                 if progress2%3 == 0:
                     feat_size = 16
                 elif progress2%3 == 1:
@@ -307,11 +309,11 @@ def demo(x_obs, v_obs, write_path=None):
                 elif progress2%3 == 2:
                     feat_size = 64
 
-                if step / (180*demo_loop) * 8 == round(step / (180*demo_loop) * 8):
+                if step / (180*demo_loop) * 4 == round(step / (180*demo_loop) * 4):
                     spos = np.random.rand(2)
                     spos[0] = spos[0]*0.8+0.1
                     spos[1] = spos[1]*0.25+0.65
-                    id = int(progress/2)
+                    id = int(progress)
                     signal_pos = {"global":local2global(id, spos), "local":spos, "id":id}
             step += 1
             k = cv2.waitKey(1)
@@ -336,9 +338,10 @@ def demo(x_obs, v_obs, write_path=None):
         # Render
         if render:
             render = False
+            v_query = np.array([pos[0], pos[1], 0, np.cos(ang), np.sin(ang), 1, 0])
             # Network Forward
             v_query_torch = torch.FloatTensor(v_query).unsqueeze(0)
-            x_query = net.scene_render(v_query_torch.to(device), obs_act)
+            x_query = net.scene_render(v_query_torch.to(device), obs_act, noise)
             x_query = x_query[0].detach().cpu()
             x_query_view = cv2.cvtColor(x_query.permute(1,2,0).numpy(), cv2.COLOR_BGR2RGB)
             x_query_view = cv2.resize(x_query_view, img_size, interpolation=cv2.INTER_NEAREST)
@@ -346,7 +349,7 @@ def demo(x_obs, v_obs, write_path=None):
             # Draw Signal
             signal_query = np.zeros_like(x_query_view)
             if signal_pos is not None:
-                std = 0.04
+                std = 0.03#0.04
                 hp = gaussian_heatmap(signal_pos["local"], std, (feat_size,feat_size,args.c))
                 view_cell_sim = hp / np.max(hp) * signal_amp
                 view_cell_torch = torch.FloatTensor(view_cell_sim).reshape(1,feat_size,feat_size,args.c).permute(0,3,1,2).to(device)
@@ -355,12 +358,17 @@ def demo(x_obs, v_obs, write_path=None):
                 routing = routing.permute(0,2,3,1).detach().cpu().reshape(feat_size,feat_size,args.c).numpy()[:,:,0:3]
                 signal_query = cv2.resize(routing, img_size, interpolation=cv2.INTER_NEAREST)
             
+            # Signal Masked Image
+            color = (0.8,0.8,0.8)
             x_signal_view = x_query_view * (signal_query*0.7+0.3)    
-            cv2.rectangle(signal_query, (0,0), img_size, (0.2,0.2,0.2), 12)
-            cv2.rectangle(x_signal_view, (0,0), img_size, (0.3,0.3,0.3), 12)
+            cv2.rectangle(x_signal_view, (0,0), img_size, color, 12)
+            cv2.putText(x_signal_view, "Signal Masked Image", (10,24), cv2.FONT_HERSHEY_TRIPLEX , 0.6, color, 1, cv2.LINE_AA)
+            
+            # Signal Image
+            color = (0.6,0.6,0.6)
             ren_text = "Query Signal " + str(feat_size) + "x" + str(feat_size)
-            cv2.putText(signal_query, ren_text, (10,24), cv2.FONT_HERSHEY_TRIPLEX , 0.6, (0,0,1), 1, cv2.LINE_AA)
-            cv2.putText(x_signal_view, "Signal Masked Image", (10,24), cv2.FONT_HERSHEY_TRIPLEX , 0.6, (0,0,1), 1, cv2.LINE_AA)
+            cv2.rectangle(signal_query, (0,0), img_size, color, 12)
+            cv2.putText(signal_query, ren_text, (10,24), cv2.FONT_HERSHEY_TRIPLEX , 0.6, color, 1, cv2.LINE_AA)
             x_signal_canvas = cv2.vconcat([x_signal_view,signal_query])
 
             # Draw Query Image 
@@ -422,6 +430,8 @@ def demo(x_obs, v_obs, write_path=None):
 
 obs_act = np.array([0]*obs_size)
 obs_act[0:3] = 1
+if signal_demo:
+    demo_loop = 4
 for it, batch in enumerate(data_loader):
     print("[ Data", it+1, "]")
     print("Press BACKSPACE to skip the data or others to run ...")
@@ -439,6 +449,7 @@ for it, batch in enumerate(data_loader):
         print("[ Data", it+1, "| Batch", bit+1, "/", image.shape[0], "]")
         x_obs = image[bit,:obs_size]
         v_obs = pose[bit,:obs_size].reshape(-1,7)
+        path = result_path+"data_"+str(it+1).zfill(2)+"_batch_"+str(bit+1).zfill(2)+".avi"
         if obs_demo == True:
             path = result_path+"demo1_data_"+str(it+1).zfill(2)+"_batch_"+str(bit+1).zfill(2)+".avi"
         if signal_demo == True:

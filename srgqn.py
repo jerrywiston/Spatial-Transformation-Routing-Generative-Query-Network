@@ -99,7 +99,7 @@ class SRGQN(nn.Module):
         self.wrd_cell_record = self.step_observation_encode(x, v)
         self.scene_cell_record = torch.sigmoid(torch.sum(self.wrd_cell_record, 0, keepdim=True))
 
-    def scene_render(self, vq, obs_act=None):
+    def scene_render(self, vq, obs_act=None, noise=False):
         self.scene_cell_record = torch.zeros_like(self.scene_cell_record)
         if obs_act is not None:
             for i in range(obs_act.shape[0]):
@@ -110,6 +110,6 @@ class SRGQN(nn.Module):
         sample_size = (self.view_size[0]*self.down_size, self.view_size[1]*self.down_size)
         view_cell_query = self.strn.query(self.scene_cell_record, vq)
         sample_size = (self.view_size[0]*self.down_size, self.view_size[1]*self.down_size)
-        x_query = self.generator.sample(sample_size, view_cell_query)
+        x_query = self.generator.sample(sample_size, view_cell_query, noise)
         #
         return x_query
