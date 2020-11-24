@@ -21,8 +21,8 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 
-#from srgqn import SRGQN
-from srgqn_vae import SRGQN
+from srgqn import SRGQN
+#from srgqn_vae import SRGQN
 from dataset import GqnDatasets
 np.set_printoptions(precision=3)
 
@@ -249,13 +249,15 @@ def demo(x_obs, v_obs, write_path=None):
                     ang = np.deg2rad(180+query_ang)
             # Move Control
             if k == ord('w'):
-                render = True
-                pos[0] -= np.cos(ang) * 0.05
-                pos[1] -= np.sin(ang) * 0.05
+                pos_temp = [pos[0] - np.cos(ang)*0.05, pos[1] - np.sin(ang)*0.05]
+                if -1 <= pos_temp[0] <= 1 and -1 <= pos_temp[1] <= 1:
+                    render = True
+                    pos = pos_temp
             if k == ord('s'):
-                render = True
-                pos[0] += np.cos(ang) * 0.05
-                pos[1] += np.sin(ang) * 0.05
+                pos_temp = [pos[0] + np.cos(ang)*0.05, pos[1] + np.sin(ang)*0.05]
+                if -1 <= pos_temp[0] <= 1 and -1 <= pos_temp[1] <= 1:
+                    render = True
+                    pos = pos_temp
             if k == ord('q'):
                 render = True
                 ang += np.deg2rad(4)
@@ -263,13 +265,15 @@ def demo(x_obs, v_obs, write_path=None):
                 render = True
                 ang -= np.deg2rad(4)
             if k == ord('a'):
-                render = True
-                pos[0] += np.sin(ang) * 0.05
-                pos[1] -= np.cos(ang) * 0.05
+                pos_temp = [pos[0] + np.sin(ang)*0.05, pos[1] - np.cos(ang)*0.05]
+                if -1 <= pos_temp[0] <= 1 and -1 <= pos_temp[1] <= 1:
+                    render = True
+                    pos = pos_temp
             if k == ord('d'):
-                render = True
-                pos[0] -= np.sin(ang) * 0.05
-                pos[1] += np.cos(ang) * 0.05
+                pos_temp = [pos[0] - np.sin(ang)*0.05, pos[1] + np.cos(ang)*0.05]
+                if -1 <= pos_temp[0] <= 1 and -1 <= pos_temp[1] <= 1:
+                    render = True
+                    pos = pos_temp
             # Switch to Observation Camera
             if ord('1') <= k <= ord('8'):
                 render = True
