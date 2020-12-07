@@ -39,10 +39,10 @@ class Discriminator(nn.Module):
         # ResBlock 1
         hidden = self.conv2(F.leaky_relu(out, inplace=True))
         out = self.conv3(F.leaky_relu(hidden, inplace=True)) + out
+        feature_layer = out
         # Pool + Feature Dim
         out = self.pool3(out)
         out = self.conv4(out)
-        feature_layer = out
         # ResBlock 2
         hidden = self.conv5(F.leaky_relu(out, inplace=True))
         out = self.conv6(F.leaky_relu(hidden, inplace=True)) + out

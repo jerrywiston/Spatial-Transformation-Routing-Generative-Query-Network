@@ -173,7 +173,7 @@ net = SRGQN(n_wrd_cells=args.w, view_size=args.v, csize=args.c, ch=args.ch, vsiz
 params = list(net.parameters())
 opt = optim.Adam(params, lr=5e-5, betas=(0.5, 0.999))
 #net.load_state_dict(torch.load("experiments/2020-11-21_rfc_no_rot_w2000_c128/save/srgqn.pth"))
-netD = discriminator.Discriminator()
+netD = discriminator.Discriminator().to(device)
 paramsD = list(netD.parameters())
 optD = optim.Adam(paramsD, lr=5e-5, betas=(0.5, 0.999))
 ############ Training ############
@@ -229,11 +229,12 @@ while(True):
         ## Real
         d_real_logit, _ = netD(x_query_gt)
         d_real = torch.sigmoid(d_real_logit)
-        d_real_loss = nn.BCELoss(d_real, torch.ones_like(d_real))
+        d_real_loss = nn.BCELoss()(d_real, torch.ones_like(d_real).to(device))
         ## Fake
+        x_query, kl_query = net(x_obs, v_obs, x_query_gt, v_query, n_obs=obs_size)
         d_fake_logit, _ = netD(x_query)
         d_fake = torch.sigmoid(d_fake_logit)
-        d_fake_loss = nn.BCELoss(d_fake, torch.zeros_like(d_fake))
+        d_fake_loss = nn.BCELoss()(d_fake, torch.zeros_like(d_fake).to(device))
         ## Loss
         d_loss = d_real_loss + d_fake_loss
         d_loss.backward()
@@ -252,9 +253,9 @@ while(True):
         feat_loss = nn.MSELoss()(f_query, f_query_gt).mean()
         ## Advsersarial
         g_fake = torch.sigmoid(g_fake_logit)
-        g_loss = nn.BCELoss(g_fake, torch.zeros_like(g_fake))
+        g_loss = nn.BCELoss()(g_fake, torch.ones_like(g_fake).to(device))
         ## Total Loss
-        loss_query = feat_loss + g_loss + args.kl_scale*kl_query
+        loss_query = 2*lh_query + 0.01*g_loss + args.kl_scale*kl_query #+ 0.5*feat_loss
         
         # ------------ Train ------------
         loss_query.backward()
@@ -266,10 +267,12 @@ while(True):
             loss_query = float(loss_query.detach().cpu().numpy())
             lh_query = float(lh_query.detach().cpu().numpy())
             kl_query = float(kl_query.detach().cpu().numpy())
+            g_loss = float(g_loss.detach().cpu().numpy())
+            d_loss = float(d_loss.detach().cpu().numpy())
 
-            print("[Ep %s (%s/%s)] loss_q: %f| lh_q: %f| kl_q: %f"%( \
+            print("[Ep %s (%s/%s)] loss_q: %f| lh_q: %f| kl_q: %f| G_loss: %f| D_loss: %f"%( \
                 str(epochs).zfill(4), str(steps), str(total_steps), \
-                loss_query, lh_query, kl_query))
+                loss_query, lh_query, kl_query, g_loss, d_loss))
             
             loss_query_list.append(loss_query)
             lh_query_list.append(lh_query)
