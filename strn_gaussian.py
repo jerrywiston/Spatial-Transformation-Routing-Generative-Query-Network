@@ -33,19 +33,30 @@ class STRN(nn.Module):
             nn.Linear(128, emb_size)
         )
 
-    def sample_wcode(self, dist, samp_size):
+    def sample_wcode(self, dist, samp_size=None):
+        if samp_size == None:
+            samp_size = self.n_wrd_cells
         if dist == "gaussian":
             self.wdist = torch.randn(samp_size, self.wcode_size).to(device)
         elif dist == "uniform":
             self.wdist = (torch.rand(samp_size, self.wcode_size)*2-1).to(device)
+        elif dist == "grid":
+            x = torch.linspace(-1, 1, samp_size[0])
+            y = torch.linspace(-1, 1, samp_size[1])
+            z = torch.linspace(-1, 1, samp_size[2])
+            x_grid, y_grid, z_grid = torch.meshgrid(x, y, z)
+            self.wdist = torch.cat((torch.unsqueeze(x_grid,0), torch.unsqueeze(y_grid,0), torch.unsqueeze(z_grid,0)), dim=0)
+            self.wdist = self.wdist.reshape(3,-1).permute(1,0).to(device)
         else:
             self.wdist = torch.randn(samp_size, self.wcode_size).to(device)
 
-    def transform(self, v, view_size=None):
+    def transform(self, v, view_size=None, wdist=None):
         if view_size is None:
             view_size = self.view_size
+        if wdist is None:
+            wdist = self.wdist
         # Get Transform Location Code of World Cells
-        wcode_tile = self.wdist.reshape(-1, self.n_wrd_cells, self.wcode_size).repeat(v.shape[0], 1, 1)
+        wcode_tile = wdist.reshape(-1, self.n_wrd_cells, self.wcode_size).repeat(v.shape[0], 1, 1)
         v_tile = v.reshape(-1, 1, self.vsize).repeat(1, self.n_wrd_cells, 1)
         wcode = torch.cat((wcode_tile, v_tile), dim=2).reshape(self.n_wrd_cells*v.shape[0],-1)
         h = F.relu(self.fc1(wcode))
@@ -66,9 +77,11 @@ class STRN(nn.Module):
         relation = torch.bmm(cs_embedding, vs_embedding.permute(0,2,1)) #(-1, wrd_cell, view_cell)
         return relation, activation, wcode
 
-    def forward(self, view_cell, v, view_size=None):
+    def forward(self, view_cell, v, view_size=None, augment=False):
         if view_size is None:
             view_size = self.view_size
+        if augment:
+            pass
         relation, activation, wcode = self.transform(v, view_size=view_size)
         distribution = torch.softmax(relation, 2)
         route = distribution * activation   # (-1, n_wrd_cells, n_view_cells)

@@ -206,7 +206,6 @@ while(True):
         v_obs = pose[:,obs_idx].reshape(-1,7).to(device)
         x_query_gt = image[:,query_idx].to(device)
         v_query = pose[:,query_idx].to(device)
-
         # ------------ Get data (Fixed Observation) ------------
         '''
         obs_size = 3
@@ -226,6 +225,7 @@ while(True):
         # ------------ Train ------------
         loss_query.backward()
         opt.step()
+        net.strn.sample_wcode(dist = "uniform")
         steps += 1
         
         # ------------ Print Result ------------
