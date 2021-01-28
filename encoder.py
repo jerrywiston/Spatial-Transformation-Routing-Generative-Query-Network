@@ -30,8 +30,9 @@ class EncoderNetworkLight(nn.Module):
         return out
 
 class EncoderNetworkTower(nn.Module):
-    def __init__(self):
-        super(EncoderNetworkTower, self, bn=True).__init__()
+    def __init__(self, csize=64):
+        super(EncoderNetworkTower, self).__init__()
+        self.csize = 64
         self.conv1 = nn.Conv2d(3, 256, kernel_size=2, stride=2)
         self.conv2 = nn.Conv2d(256, 256, kernel_size=2, stride=2)
         self.conv3 = nn.Conv2d(256, 128, kernel_size=3, stride=1, padding=1)
@@ -39,7 +40,7 @@ class EncoderNetworkTower(nn.Module):
         self.conv5 = nn.Conv2d(256, 256, kernel_size=3, stride=1, padding=1)
         self.conv6 = nn.Conv2d(256, 128, kernel_size=3, stride=1, padding=1)
         self.conv7 = nn.Conv2d(128, 256, kernel_size=3, stride=1, padding=1)
-        self.conv8 = nn.Conv2d(256, 256, kernel_size=1, stride=1)
+        self.conv8 = nn.Conv2d(256, csize, kernel_size=1, stride=1)
 
     def forward(self, x):
         skip_in  = F.relu(self.conv1(x))
@@ -55,8 +56,8 @@ class EncoderNetworkTower(nn.Module):
         return r
 
 class EncoderNetworkTowerBN(nn.Module):
-    def __init__(self):
-        super(EncoderNetworkTowerBN, self, bn=True).__init__()
+    def __init__(self, csize=64):
+        super(EncoderNetworkTowerBN, self).__init__()
         self.conv1 = nn.Conv2d(3, 256, kernel_size=2, stride=2)
         self.conv2 = nn.Conv2d(256, 256, kernel_size=2, stride=2)
         self.bn2 = nn.BatchNorm2d(256)
@@ -69,8 +70,8 @@ class EncoderNetworkTowerBN(nn.Module):
         self.conv6 = nn.Conv2d(256, 128, kernel_size=3, stride=1, padding=1)
         self.bn6 = nn.BatchNorm2d(128)
         self.conv7 = nn.Conv2d(128, 256, kernel_size=3, stride=1, padding=1)
-        self.bn7 = nn.BatchNorm2d(256)
-        self.conv8 = nn.Conv2d(256, 256, kernel_size=1, stride=1)
+        self.bn7 = nn.BatchNorm2d(csize)
+        self.conv8 = nn.Conv2d(256, csize, kernel_size=1, stride=1)
 
     def forward(self, x):
         skip_in  = F.relu(self.conv1(x))
