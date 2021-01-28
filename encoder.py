@@ -5,28 +5,10 @@ from padding_same_conv import Conv2d
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-class EncoderNetwork(nn.Module):
-    def __init__(self, ch=64, csize=128, down_size=4):
-        super(EncoderNetwork, self).__init__()
-        if down_size == 2:
-            self.net = nn.Sequential(
-                # (ch,64,64)
-                Conv2d(3, ch, 3, stride=1),
-                nn.LeakyReLU(),
-                # (ch,64,64)
-                Conv2d(ch, ch, 3, stride=1),
-                nn.LeakyReLU(),
-                nn.BatchNorm2d(ch),
-                # (ch/2,32,32)
-                Conv2d(ch, ch*2, 3, stride=2),
-                nn.LeakyReLU(),
-                nn.BatchNorm2d(ch*2),
-                # (ch/2,32,32)
-                Conv2d(ch*2, csize, 3, stride=1),
-                # (tsize,32,32)
-            )
-        else:
-            self.net = nn.Sequential(
+class EncoderNetworkLight(nn.Module):
+    def __init__(self, ch=64, csize=128):
+        super(EncoderNetworkLight, self).__init__()
+        self.net = nn.Sequential(
                 # (ch,64,64)
                 Conv2d(3, ch, 5, stride=2),
                 nn.LeakyReLU(),
@@ -41,41 +23,72 @@ class EncoderNetwork(nn.Module):
                 # (ch/2,16,16)
                 Conv2d(ch*2, csize, 3, stride=1),
                 # (tsize,16,16)
-            )
+        )
         
     def forward(self, x):
         out = self.net(x)
         return out
 
-class EncoderNetwork2(nn.Module):
-    def __init__(self, ch=64, csize=128, down_size=4):
-        super(EncoderNetwork2, self).__init__()
-        self.conv1 = Conv2d(3, ch, 3, stride=2)
-        self.conv2 = Conv2d(ch, ch, 3, stride=1)
-        self.bn2 = nn.BatchNorm2d(ch)
-        self.conv3 = Conv2d(ch, ch, 3, stride=2)
-        self.bn3 = nn.BatchNorm2d(ch)
-        # Local Path
-        self.conv4 = Conv2d(ch, ch*2, 3, stride=1)
-        self.bn4 = nn.BatchNorm2d(ch*2)
-        self.conv5 = Conv2d(ch*2, ch*2, 3, stride=1)
-        self.bn5 = nn.BatchNorm2d(ch*2)
-        self.conv6 = Conv2d(ch*2, csize, 1, stride=1)
+class EncoderNetworkTower(nn.Module):
+    def __init__(self):
+        super(EncoderNetworkTower, self, bn=True).__init__()
+        self.conv1 = nn.Conv2d(3, 256, kernel_size=2, stride=2)
+        self.conv2 = nn.Conv2d(256, 256, kernel_size=2, stride=2)
+        self.conv3 = nn.Conv2d(256, 128, kernel_size=3, stride=1, padding=1)
+        self.conv4 = nn.Conv2d(128, 256, kernel_size=2, stride=2)
+        self.conv5 = nn.Conv2d(256, 256, kernel_size=3, stride=1, padding=1)
+        self.conv6 = nn.Conv2d(256, 128, kernel_size=3, stride=1, padding=1)
+        self.conv7 = nn.Conv2d(128, 256, kernel_size=3, stride=1, padding=1)
+        self.conv8 = nn.Conv2d(256, 256, kernel_size=1, stride=1)
 
     def forward(self, x):
-        out = F.leaky_relu(self.conv1(x), inplace=True)
-        out = self.bn2(F.leaky_relu(self.conv2(out), inplace=True)) + out
-        out = self.bn3(F.leaky_relu(self.conv3(out), inplace=True))
-        # Local Path
-        out = self.bn4(F.leaky_relu(self.conv4(out), inplace=True))
-        out = self.bn5(F.leaky_relu(self.conv5(out), inplace=True)) + out
-        out = self.conv6(out)
-        return out
+        skip_in  = F.relu(self.conv1(x))
+        skip_out = F.relu(self.conv2(skip_in))
+
+        r = F.relu(self.conv3(skip_in))
+        skip_in = F.relu(self.conv4(r)) + skip_out
+        skip_out  = F.relu(self.conv5(skip_in))
+
+        r = F.relu(self.conv6(skip_in))
+        r = F.relu(self.conv7(r)) + skip_out
+        r = F.relu(self.conv8(r))
+        return r
+
+class EncoderNetworkTowerBN(nn.Module):
+    def __init__(self):
+        super(EncoderNetworkTowerBN, self, bn=True).__init__()
+        self.conv1 = nn.Conv2d(3, 256, kernel_size=2, stride=2)
+        self.conv2 = nn.Conv2d(256, 256, kernel_size=2, stride=2)
+        self.bn2 = nn.BatchNorm2d(256)
+        self.conv3 = nn.Conv2d(256, 128, kernel_size=3, stride=1, padding=1)
+        self.bn3 = nn.BatchNorm2d(128)
+        self.conv4 = nn.Conv2d(128, 256, kernel_size=2, stride=2)
+        self.bn4 = nn.BatchNorm2d(256)
+        self.conv5 = nn.Conv2d(256, 256, kernel_size=3, stride=1, padding=1)
+        self.bn5 = nn.BatchNorm2d(256)
+        self.conv6 = nn.Conv2d(256, 128, kernel_size=3, stride=1, padding=1)
+        self.bn6 = nn.BatchNorm2d(128)
+        self.conv7 = nn.Conv2d(128, 256, kernel_size=3, stride=1, padding=1)
+        self.bn7 = nn.BatchNorm2d(256)
+        self.conv8 = nn.Conv2d(256, 256, kernel_size=1, stride=1)
+
+    def forward(self, x):
+        skip_in  = F.relu(self.conv1(x))
+        skip_out = self.bn2(F.relu(self.conv2(skip_in)))
+
+        r = F.relu(self.conv3(skip_in))
+        skip_in = self.bn4(F.relu(self.conv4(r))) + skip_out
+        skip_out  = self.bn5(F.relu(self.conv5(skip_in)))
+
+        r = self.bn6(F.relu(self.conv6(skip_in)))
+        r = self.bn7(F.relu(self.conv7(r))) + skip_out
+        r = F.relu(self.conv8(r))
+        return r
 
 from blurPooling import BlurPool2d
-class EncoderNetwork3(nn.Module):
+class EncoderNetworkRes(nn.Module):
     def __init__(self, ch=64, csize=128, down_size=4):
-        super(EncoderNetwork3, self).__init__()
+        super(EncoderNetworkRes, self).__init__()
         # Stem
         self.conv1 = Conv2d(3, ch, 5, stride=2)
         self.bn1 = nn.BatchNorm2d(ch)
