@@ -12,67 +12,17 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 
 from strgqn import SRGQN
-from dataset import GqnDatasets
+import shapenet_dataset
 
 import numpy as np
-import matplotlib.pyplot as plt
-
-############ Util Functions ############
-def draw_result(net, dataset, obs_size=3, gen_size=5, img_size=(64,64), convert_bgr=True):
-    data_loader = DataLoader(dataset, batch_size=1, shuffle=False)
-    for it, batch in enumerate(data_loader):
-        image = batch[0].squeeze(0)
-        pose = batch[1].squeeze(0)
-        # Get Data
-        x_obs = image[:,:obs_size].reshape(-1,3,img_size[0],img_size[1]).to(device)
-        v_obs = pose[:,:obs_size].reshape(-1,7).to(device)
-        v_query = pose[:,obs_size].to(device)
-        x_query = net.sample(x_obs, v_obs, v_query, n_obs=obs_size)
-        # Draw Observation
-        canvas = np.zeros((img_size[0]*gen_size,img_size[1]*(obs_size+2),3), dtype=np.uint8)
-        x_obs_draw = (image[:gen_size,:obs_size].detach()*255).permute(0,3,1,4,2).cpu().numpy().astype(np.uint8)
-        x_obs_draw = cv2.cvtColor(x_obs_draw.reshape(img_size[0]*gen_size,img_size[1]*obs_size,3), cv2.COLOR_BGR2RGB)
-        canvas[:img_size[0]*gen_size,:img_size[1]*obs_size,:] = x_obs_draw
-        # Draw Query GT
-        x_gt_draw = (image[:gen_size,obs_size].detach()*255).permute(0,2,3,1).cpu().numpy().astype(np.uint8)
-        x_gt_draw = x_gt_draw.reshape(img_size[0]*gen_size,img_size[1],3)
-        if convert_bgr:
-            x_gt_draw = cv2.cvtColor(x_gt_draw, cv2.COLOR_BGR2RGB)
-        canvas[:,img_size[1]*(obs_size):img_size[1]*(obs_size+1),:] = x_gt_draw
-        # Draw Query Gen
-        x_query_draw = (x_query[:gen_size].detach()*255).permute(0,2,3,1).cpu().numpy().astype(np.uint8)
-        x_query_draw = x_query_draw.reshape(img_size[0]*gen_size,img_size[1],3)
-        if convert_bgr:
-            x_query_draw = cv2.cvtColor(x_query_draw, cv2.COLOR_BGR2RGB)
-        canvas[:,img_size[1]*(obs_size+1):,:] = x_query_draw
-        # Draw Grid
-        cv2.line(canvas, (0,0),(0,img_size[1]*gen_size),(0,0,0), 2)
-        cv2.line(canvas, (img_size[0]*(obs_size+2)-1,0),(img_size[1]*(obs_size+2)-1,img_size[1]*gen_size),(0,0,0), 2)
-        cv2.line(canvas, (img_size[0]*obs_size,0),(img_size[1]*obs_size,img_size[1]*gen_size),(255,0,0), 2)
-        cv2.line(canvas, (img_size[0]*(obs_size+1),0),(img_size[1]*(obs_size+1),img_size[1]*gen_size),(0,0,255), 2)
-        for i in range(1,3):
-            canvas[:,img_size[1]*i:img_size[1]*i+1,:] = 0
-        for i in range(gen_size):
-            canvas[img_size[0]*i:img_size[0]*i+1,:,:] = 0
-            canvas[img_size[0]*(i+1)-1:img_size[0]*(i+1),:,:] = 0
-        break
-    return canvas
 
 def eval(net, dataset, obs_size=3, max_batch=1000, img_size=(64,64)):
-    data_loader = DataLoader(dataset, batch_size=1, shuffle=False)
     rmse_record = []
     mae_record = []
     ce_record = []
-    for it, batch in enumerate(data_loader):
-        if it+1 > max_batch:
-            break
-        image = batch[0].squeeze(0)
-        pose = batch[1].squeeze(0)
+    for it in range(max_batch):
         # Get Data
-        x_obs = image[:,:obs_size].reshape(-1,3,img_size[0],img_size[1]).to(device)
-        v_obs = pose[:,:obs_size].reshape(-1,7).to(device)
-        v_query = pose[:,obs_size].to(device)
-        x_query_gt = image[:,obs_size].to(device)
+        x_obs, v_obs, x_query_gt, v_query = shapenet_dataset.get_batch(test_dataset, obs_size, 1)
         with torch.no_grad():
             x_query_sample = net.sample(x_obs, v_obs, v_query, n_obs=obs_size)
             # rmse
@@ -151,9 +101,11 @@ else:
 
 ############ Dataset ############
 path = args.data_path
-test_dataset = GqnDatasets(root_dir=path, train=False, fraction=args.frac_test)
+train_dataset = shapenet_dataset.read_dataset(path=path, mode="train")
+test_dataset = shapenet_dataset.read_dataset(path=path, mode="test")
 print("Data path: %s"%(args.data_path))
 print("Data fraction: %f / %f"%(args.frac_train, args.frac_test))
+print("Train data: ", len(train_dataset))
 print("Test data: ", len(test_dataset))
 
 ############ Create Folder ############
@@ -170,7 +122,7 @@ net.load_state_dict(torch.load(save_path+"srgqn.pth"))
 net.eval()
 
 test_loader = DataLoader(test_dataset, batch_size=1, shuffle=True)
-rmse_mean, rmse_std, mae_mean, mae_std = eval(net, test_dataset, obs_size=3, img_size=args.img_size)
+rmse_mean, rmse_std, mae_mean, mae_std, ce_mean, ce_std = eval(net, test_dataset, obs_size=3, img_size=args.img_size)
 print("RMSE:", rmse_mean, "+/-", rmse_std)
 print("MAE:", mae_mean, "+/-", mae_std)
 print("CE:", ce_mean, "+/-", ce_std)
