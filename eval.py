@@ -170,7 +170,7 @@ net.load_state_dict(torch.load(save_path+"srgqn.pth"))
 net.eval()
 
 test_loader = DataLoader(test_dataset, batch_size=1, shuffle=True)
-rmse_mean, rmse_std, mae_mean, mae_std = eval(net, test_dataset, obs_size=3, img_size=args.img_size)
+rmse_mean, rmse_std, mae_mean, mae_std, ce_mean, ce_std = eval(net, test_dataset, obs_size=3, img_size=args.img_size)
 print("RMSE:", rmse_mean, "+/-", rmse_std)
 print("MAE:", mae_mean, "+/-", mae_std)
 print("CE:", ce_mean, "+/-", ce_std)

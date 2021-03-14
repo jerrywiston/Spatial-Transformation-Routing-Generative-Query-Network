@@ -6,7 +6,7 @@ def read_dataset(path="shapenet_data.npz", mode="train"):
     data = np.load(path)[mode]
     return data
 
-def get_pose_code(id, theta_bias, phi_bias):
+def get_pose_code(id, theta_bias=0, phi_bias=0):
     theta = float(int(id/18+1)*20 + theta_bias)
     phi = float((id%18)*20 + phi_bias)
     #print(theta, phi)

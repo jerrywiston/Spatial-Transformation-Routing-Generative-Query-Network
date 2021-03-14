@@ -2,7 +2,8 @@ import os, gzip
 import numpy as np
 import torch
 from torch.utils.data import Dataset
-
+import torch.nn.functional as F
+import distort
 
 def transform_viewpoint(v):
     """
@@ -44,7 +45,7 @@ class GqnDatasets(Dataset):
     def __len__(self):
         return len(self.records)
 
-    def __getitem__(self, idx):
+    def __getitem__(self, idx, use_distort="barrel"):
         scene_path = os.path.join(self.root_dir, self.records[idx])
         with gzip.open(scene_path, "r") as f:
             data = torch.load(f)
@@ -60,6 +61,17 @@ class GqnDatasets(Dataset):
 
         if self.transform:
             images = self.transform(images)
+        
+        if use_distort is not None:
+            if use_distort == "barrel":
+                grid = distort.distort_barrel(images.shape[3], images.shape[4])
+            elif use_distort == "sin":
+                grid = distort.distort_sin(images.shape[3], images.shape[4])
+            shape_rec = images.shape
+            images = images.reshape(shape_rec[0]*shape_rec[1], shape_rec[2], shape_rec[3], shape_rec[4])
+            grid = torch.FloatTensor(grid).repeat(images.shape[0],1,1,1)
+            images = F.grid_sample(images, grid=grid)
+            images = images.reshape(shape_rec)
 
         viewpoints = torch.FloatTensor(viewpoints)
         if self.target_transform:
