@@ -57,4 +57,11 @@ net = STRGQN(n_wrd_cells=args.w, view_size=args.v, csize=args.c, ch=args.ch, vsi
 net.load_state_dict(torch.load(save_path+"srgqn.pth"))
 net.eval()
 
-utils.draw_query(net, test_dataset, result_path, obs_size=3, vsize=args.vsize, row_size=5, gen_size=100, img_size=args.img_size)
+obs_size = 3
+row_size = 1
+gen_size = 400
+
+img_list = utils.draw_query(net, test_dataset, obs_size=obs_size, vsize=args.vsize, row_size=row_size, gen_size=gen_size, img_size=args.img_size)
+print("Output image files ...")
+for i in range(len(img_list)):
+    cv2.imwrite(result_path+"result_"+str(i).zfill(3)+".jpg", img_list[i]) 
