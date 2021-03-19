@@ -1,4 +1,5 @@
-# Load Configyre
+import argparse
+import configparser
 
 def get_config_strgqn(config):
     # Fill the parameters
@@ -10,9 +11,22 @@ def get_config_strgqn(config):
     args.ch = config.getint('model', 'ch')
     args.down_size = config.getint('model', 'down_size')
     args.draw_layers = config.getint('model', 'draw_layers')
-    args.vsize = config.getint('model', 'vsize')
     args.share_core = config.getboolean('model', 'share_core')
-    args.view_trans = config.getboolean('model', 'view_trans')
+    
+    if config.has_option('model', 'vsize'):
+        args.vsize = config.getint('model', 'vsize')
+    else:
+        args.vsize = 7
+
+    if config.has_option('model', 'stocahstic_unit'):
+        args.stochastic_unit = config.getboolean('model', 'stocahstic_unit')
+    else:
+        args.stochastic_unit = True
+    
+    if config.has_option('model', 'view_trans'):
+        args.view_trans = config.getboolean('model', 'view_trans')
+    else:
+        args.view_trans = True
     # Experimental Parameters
     args.data_path = config.get('exp', 'data_path')
     args.frac_train = config.getfloat('exp', 'frac_train')
@@ -25,6 +39,12 @@ def get_config_strgqn(config):
         args.convert_rgb = config.getboolean('exp', 'convert_bgr')
     else:
         args.convert_rgb = True
+    if config.has_option('exp', 'distort_type'):
+        args.distort_type = config.get('exp', 'distort_type')
+        if args.distort_type == "None":
+            args.distort_type = None
+    else:
+        args.distort_type = None
     return args
 
 def get_config_gqn(config):
@@ -36,9 +56,21 @@ def get_config_gqn(config):
     args.ch = config.getint('model', 'ch')
     args.down_size = config.getint('model', 'down_size')
     args.draw_layers = config.getint('model', 'draw_layers')
-    args.vsize = config.getint('model', 'vsize')
     args.share_core = config.getboolean('model', 'share_core')
-    args.view_trans = config.getboolean('model', 'view_trans')
+    if config.has_option('model', 'vsize'):
+        args.vsize = config.getint('model', 'vsize')
+    else:
+        args.vsize = 7
+
+    if config.has_option('model', 'stocahstic_unit'):
+        args.stochastic_unit = config.getboolean('model', 'stocahstic_unit')
+    else:
+        args.stochastic_unit = True
+    
+    if config.has_option('model', 'view_trans'):
+        args.view_trans = config.getboolean('model', 'view_trans')
+    else:
+        args.view_trans = True
     # Experimental Parameters
     args.data_path = config.get('exp', 'data_path')
     args.frac_train = config.getfloat('exp', 'frac_train')
@@ -48,7 +80,19 @@ def get_config_gqn(config):
     args.total_epochs = config.getint('exp', 'total_epochs')
     args.kl_scale = config.getfloat('exp', 'kl_scale')
     if config.has_option('exp', 'convert_bgr'):
-        args.convert_rgb = config.getboolean('exp', 'convert_bgr')
+        args.convert_rgb = config.get('exp', 'convert_bgr')
     else:
         args.convert_rgb = True
+    if config.has_option('exp', 'distort_type'):
+        args.distort_type = config.get('exp', 'distort_type')
+    else:
+        args.distort_type = None
+    return args
+
+def load_eval_config(exp_path):
+    config_file = exp_path + "config.conf"
+    config = configparser.ConfigParser()
+    config.read(config_file)
+    args = get_config(config)
+    args.img_size = (args.v[0]*args.down_size, args.v[1]*args.down_size)
     return args

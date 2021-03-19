@@ -15,14 +15,14 @@ from torch.utils.data import DataLoader
 from dataset import GqnDatasets
 
 ############ Util Functions ############
-def draw_result(net, dataset, obs_size=3, gen_size=5, img_size=(64,64), convert_bgr=True):
+def draw_result(net, dataset, obs_size=3, gen_size=5, vsize=7, img_size=(64,64), convert_bgr=True):
     data_loader = DataLoader(dataset, batch_size=1, shuffle=True)
     for it, batch in enumerate(data_loader):
         image = batch[0].squeeze(0)
         pose = batch[1].squeeze(0)
         # Get Data
         x_obs = image[:,:obs_size].reshape(-1,3,img_size[0],img_size[1]).to(device)
-        v_obs = pose[:,:obs_size].reshape(-1,7).to(device)
+        v_obs = pose[:,:obs_size].reshape(-1, vsize).to(device)
         v_query = pose[:,obs_size].to(device)
         x_query = net.sample(x_obs, v_obs, v_query, n_obs=obs_size)
         # Draw Observation
@@ -55,7 +55,7 @@ def draw_result(net, dataset, obs_size=3, gen_size=5, img_size=(64,64), convert_
         break
     return canvas
 
-def eval(net, dataset, obs_size=3, max_batch=400, img_size=(64,64)):
+def eval(net, dataset, obs_size=3, vsize=7, max_batch=400, img_size=(64,64)):
     data_loader = DataLoader(dataset, batch_size=1, shuffle=False)
     lh_record = []
     kl_record = []
@@ -66,7 +66,7 @@ def eval(net, dataset, obs_size=3, max_batch=400, img_size=(64,64)):
         pose = batch[1].squeeze(0)
         # Get Data
         x_obs = image[:,:obs_size].reshape(-1,3,img_size[0],img_size[1]).to(device)
-        v_obs = pose[:,:obs_size].reshape(-1,7).to(device)
+        v_obs = pose[:,:obs_size].reshape(-1,vsize).to(device)
         v_query = pose[:,obs_size].to(device)
         x_query_gt = image[:,obs_size].to(device)
         with torch.no_grad():
@@ -103,7 +103,7 @@ if args.plus:
 else:
     from strgqn import STRGQN
 
-# Print 
+# Print Training Information
 print("Configure File: %s"%(config_file))
 print("Experiment Name: %s"%(args.exp_name))
 print("Number of world cells: %d"%(args.w))
@@ -118,15 +118,16 @@ if args.share_core:
     print("Share core: True")
 else:
     print("Share core: False")
-exit()
+
 ############ Dataset ############
 path = args.data_path
-train_dataset = GqnDatasets(root_dir=path, train=True, fraction=args.frac_train)
-test_dataset = GqnDatasets(root_dir=path, train=False, fraction=args.frac_test)
+train_dataset = GqnDatasets(root_dir=path, train=True, fraction=args.frac_train, distort_type=args.distort_type)
+test_dataset = GqnDatasets(root_dir=path, train=False, fraction=args.frac_test, distort_type=args.distort_type)
 print("Data path: %s"%(args.data_path))
 print("Data fraction: %f / %f"%(args.frac_train, args.frac_test))
 print("Train data: ", len(train_dataset))
 print("Test data: ", len(test_dataset))
+print("Distort type:", args.distort_type)
 
 ############ Create Folder ############
 now = datetime.datetime.now()
@@ -200,10 +201,15 @@ while(True):
 
         # ------------ Forward ------------
         net.zero_grad()
-        x_query, kl_query = net(x_obs, v_obs, x_query_gt, v_query, n_obs=obs_size)
-        lh_query = nn.MSELoss()(x_query, x_query_gt).mean()
-        kl_query = torch.mean(torch.sum(kl_query, dim=[1,2,3]))
-        loss_query = lh_query + args.kl_scale*kl_query
+        if args.stochastic_unit:
+            x_query, kl_query = net(x_obs, v_obs, x_query_gt, v_query, n_obs=obs_size)
+            lh_query = nn.MSELoss()(x_query, x_query_gt).mean()
+            kl_query = torch.mean(torch.sum(kl_query, dim=[1,2,3]))
+            loss_query = lh_query + args.kl_scale*kl_query
+        else:
+            x_query = net.sample(x_obs, v_obs, v_query, n_obs=obs_size)
+            kl_query = 0
+            lh_query = nn.MSELoss()(x_query, x_query_gt).mean()
 
         # ------------ Train ------------
         loss_query.backward()
@@ -234,11 +240,11 @@ while(True):
             gen_size = 5
             # Train
             fname = img_path+str(int(steps/eval_step)).zfill(4)+"_train.png"
-            canvas = draw_result(net, train_dataset, obs_size, gen_size, args.img_size)
+            canvas = draw_result(net, train_dataset, obs_size, gen_size, args.vsize, args.img_size)
             cv2.imwrite(fname, canvas)
             # Test
             fname = img_path+str(int(steps/eval_step)).zfill(4)+"_test.png"
-            canvas = draw_result(net, test_dataset, obs_size, gen_size, args.img_size)
+            canvas = draw_result(net, test_dataset, obs_size, gen_size, args.vsize, args.img_size)
             cv2.imwrite(fname, canvas)
 
             # ------------ Training Record ------------
@@ -251,9 +257,9 @@ while(True):
 
             # ------------ Evaluation Record ------------
             print("Evaluate Training Data ...")
-            lh_train, kl_train, _, _ = eval(net, train_dataset, obs_size=3, img_size=args.img_size)
+            lh_train, kl_train, _, _ = eval(net, train_dataset, obs_size=3, vsize=args.vsize, img_size=args.img_size)
             print("Evaluate Testing Data ...")
-            lh_test, kl_test, _, _ = eval(net, test_dataset, obs_size=3, img_size=args.img_size)
+            lh_test, kl_test, _, _ = eval(net, test_dataset, obs_size=3, vsize=args.vsize, img_size=args.img_size)
             eval_record["mse_train"].append(lh_train)
             eval_record["kl_train"].append(kl_train)
             eval_record["mse_test"].append(lh_test)
