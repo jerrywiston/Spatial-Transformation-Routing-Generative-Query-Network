@@ -19,9 +19,9 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # ==============================
 
 # Deterministic
-class SRGQN(nn.Module):
+class STRGQN(nn.Module):
     def __init__(self, n_wrd_cells=2000, view_size=(16,16), csize=128, ch=64, vsize=7, draw_layers=6, down_size=4, share_core=False):
-        super(SRGQN, self).__init__()
+        super(STRGQN, self).__init__()
         self.n_wrd_cells = n_wrd_cells
         self.view_size = view_size
         self.csize = csize

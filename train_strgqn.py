@@ -5,13 +5,13 @@ import json
 import datetime
 import argparse
 import configparser
+import config_handle
 
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
- 
-from strgqn import SRGQN
+
 from dataset import GqnDatasets
 
 ############ Util Functions ############
@@ -86,41 +86,22 @@ def eval(net, dataset, obs_size=3, max_batch=400, img_size=(64,64)):
     print("\nMSE =", lh_mean, ", KL =", kl_mean)
     return float(lh_mean), float(kl_mean), lh_record, kl_record
 
-def get_config(config):
-    # Fill the parameters
-    args = lambda: None
-    # Model Parameters
-    args.w = config.getint('model', 'w')
-    args.v = (config.getint('model', 'v_h'), config.getint('model', 'v_w'))
-    args.c = config.getint('model', 'c')
-    args.ch = config.getint('model', 'ch')
-    args.down_size = config.getint('model', 'down_size')
-    args.draw_layers = config.getint('model', 'draw_layers')
-    args.share_core = config.getboolean('model', 'share_core')
-    # Experimental Parameters
-    args.data_path = config.get('exp', 'data_path')
-    args.frac_train = config.getfloat('exp', 'frac_train')
-    args.frac_test = config.getfloat('exp', 'frac_test')
-    args.max_obs_size = config.get('exp', 'max_obs_size')
-    args.total_steps = config.getint('exp', 'total_steps')
-    args.total_epochs = config.getint('exp', 'total_epochs')
-    args.kl_scale = config.getfloat('exp', 'kl_scale')
-    if config.has_option('exp', 'convert_bgr'):
-        args.convert_rgb = config.getboolean('exp', 'convert_bgr')
-    else:
-        args.convert_rgb = True
-    return args
-
 ############ Parameter Parsing ############
 parser = argparse.ArgumentParser()
 parser.add_argument('--exp_name', nargs='?', type=str, default="rrc" ,help='Experiment name.')
+parser.add_argument('--plus', action="store_true" ,help='Use strgqn plus version.')
 parser.add_argument('--config', nargs='?', type=str, default="./config.conf" ,help='Config filename.')
 config_file = parser.parse_args().config
 config = configparser.ConfigParser()
 config.read(config_file)
-args = get_config(config)
+args = config_handle.get_config_strgqn(config)
 args.exp_name = parser.parse_args().exp_name
 args.img_size = (args.v[0]*args.down_size, args.v[1]*args.down_size)
+args.plus = parser.parse_args().plus
+if args.plus:
+    from strgqn_plus import STRGQN
+else:
+    from strgqn import STRGQN
 
 # Print 
 print("Configure File: %s"%(config_file))
@@ -131,11 +112,13 @@ print("Number of concepts: %d"%(args.c))
 print("Number of channels: %d"%(args.ch))
 print("Downsampling size of view cell: %d"%(args.down_size))
 print("Number of draw layers: %d"%(args.draw_layers))
+print("Size of view pose: %d"%(args.vsize))
+print("Use STR-GQN+ version: " + str(args.plus))
 if args.share_core:
     print("Share core: True")
 else:
     print("Share core: False")
-
+exit()
 ############ Dataset ############
 path = args.data_path
 train_dataset = GqnDatasets(root_dir=path, train=True, fraction=args.frac_train)
@@ -147,7 +130,6 @@ print("Test data: ", len(test_dataset))
 
 ############ Create Folder ############
 now = datetime.datetime.now()
-#tinfo = "%d-%d-%d_%d-%d"%(now.year, now.month, now.day, now.hour, now.minute) #second / microsecond
 tinfo = "%d-%d-%d"%(now.year, now.month, now.day)
 exp_path = "experiments/"
 model_name = args.exp_name + "_w%d_c%d"%(args.w, args.c)
@@ -166,7 +148,7 @@ with open(model_path + 'config.conf', 'w') as cfile:
 
 ############ Networks ############
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-net = SRGQN(n_wrd_cells=args.w, view_size=args.v, csize=args.c, ch=args.ch, vsize=7, \
+net = SRGQN(n_wrd_cells=args.w, view_size=args.v, csize=args.c, ch=args.ch, vsize=args.vsize, \
     draw_layers=args.draw_layers, down_size=args.down_size, share_core=args.share_core).to(device)
 params = list(net.parameters())
 opt = optim.Adam(params, lr=5e-5, betas=(0.5, 0.999))

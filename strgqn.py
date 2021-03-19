@@ -19,9 +19,9 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # ==============================
 
 # Deterministic
-class SRGQN(nn.Module):
+class STRGQN(nn.Module):
     def __init__(self, n_wrd_cells=2000, view_size=(16,16), csize=128, ch=64, vsize=7, draw_layers=6, down_size=4, share_core=False):
-        super(SRGQN, self).__init__()
+        super(STRGQN, self).__init__()
         self.n_wrd_cells = n_wrd_cells
         self.view_size = view_size
         self.csize = csize
@@ -30,8 +30,9 @@ class SRGQN(nn.Module):
         self.down_size = down_size
         self.draw_layers = draw_layers
 
-        #self.encoder = encoder.EncoderNetworkRes(ch, csize, down_size).to(device)
-        self.encoder = encoder.EncoderNetworkTower(csize).to(device)
+        self.encoder = encoder.EncoderNetworkRes(ch, csize, down_size).to(device)
+        #self.encoder = encoder.EncoderNetworkTower(csize).to(device)
+        #self.encoder = encoder.EncoderNetworkLight().to(device)
         self.strn = strn.STRN(n_wrd_cells, view_size=view_size, vsize=vsize, csize=csize).to(device)
         self.generator = generator.GeneratorNetwork(x_dim=3, r_dim=csize, L=draw_layers, scale=down_size, share=share_core).to(device)
         #self.generator = generator_vae.GeneratorNetwork(z_dim=32, r_dim=csize).to(device)

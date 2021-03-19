@@ -58,7 +58,7 @@ def draw_result(net, dataset, obs_size=3, gen_size=5, img_size=(64,64), convert_
         break
     return canvas
 
-def eval(net, dataset, obs_size=3, max_batch=1000, img_size=(64,64)):
+def eval(net, dataset, obs_size=1, max_batch=1000, img_size=(64,64)):
     data_loader = DataLoader(dataset, batch_size=1, shuffle=False)
     rmse_record = []
     mae_record = []
@@ -70,7 +70,7 @@ def eval(net, dataset, obs_size=3, max_batch=1000, img_size=(64,64)):
         pose = batch[1].squeeze(0)
         # Get Data
         x_obs = image[:,:obs_size].reshape(-1,3,img_size[0],img_size[1]).to(device)
-        v_obs = pose[:,:obs_size].reshape(-1,7).to(device)
+        v_obs = pose[:,:obs_size].reshape(-1,9).to(device)
         v_query = pose[:,obs_size].to(device)
         x_query_gt = image[:,obs_size].to(device)
         with torch.no_grad():
@@ -164,7 +164,7 @@ if not os.path.exists(result_path):
 
 ############ Networks ############
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-net = SRGQN(n_wrd_cells=args.w, view_size=args.v, csize=args.c, ch=args.ch, vsize=7, \
+net = SRGQN(n_wrd_cells=args.w, view_size=args.v, csize=args.c, ch=args.ch, vsize=9, \
     draw_layers=args.draw_layers, down_size=args.down_size, share_core=args.share_core).to(device)
 net.load_state_dict(torch.load(save_path+"srgqn.pth"))
 net.eval()

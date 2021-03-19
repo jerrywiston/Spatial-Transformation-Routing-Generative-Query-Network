@@ -11,13 +11,13 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 
-from gqn import GQN
+from strgqn import SRGQN
 from dataset import GqnDatasets
 
 import numpy as np
 import matplotlib.pyplot as plt
 
-def eval(net, dataset, path, obs_size=3, max_batch=100, img_size=(64,64)):
+def eval(net, dataset, path, obs_size=8, max_batch=3, img_size=(64,64)):
     data_loader = DataLoader(dataset, batch_size=1, shuffle=False)
     rmse_record = []
     mae_record = []
@@ -30,8 +30,8 @@ def eval(net, dataset, path, obs_size=3, max_batch=100, img_size=(64,64)):
         # Get Data
         x_obs = image[:,:obs_size].reshape(-1,3,img_size[0],img_size[1]).to(device)
         v_obs = pose[:,:obs_size].reshape(-1,7).to(device)
-        v_query = pose[:,3].to(device)
-        x_query_gt = image[:,3].to(device)
+        v_query = pose[:,8].to(device)
+        x_query_gt = image[:,8].to(device)
         with torch.no_grad():
             x_query_sample = net.sample(x_obs, v_obs, v_query, n_obs=obs_size)
             x_query_sample = x_query_sample.detach().permute(0,2,3,1).cpu().numpy()[0]
@@ -45,15 +45,17 @@ def eval(net, dataset, path, obs_size=3, max_batch=100, img_size=(64,64)):
         img_draw = np.concatenate(x_np, 1)*255
         img_draw = cv2.cvtColor(img_draw.astype(np.uint8), cv2.COLOR_BGR2RGB)
         for i in range(obs_size+2):
-            img_draw[:,i*img_size[1]-1:i*img_size[1]+1,:] = 255
+            img_draw[:,i*64-1:i*64,:] = 255
 
-        cv2.imwrite(path+"result_"+str(it)+".jpg", img_draw) 
+        cv2.imwrite(path+"result_"+str(it)+"_" + str(obs_size) + "obs.jpg", img_draw) 
         print("\rProgress: "+str(it).zfill(3)+"/"+str(max_batch), end="")
 
 def get_config(config):
     # Fill the parameters
     args = lambda: None
     # Model Parameters
+    args.w = config.getint('model', 'w')
+    args.v = (config.getint('model', 'v_h'), config.getint('model', 'v_w'))
     args.c = config.getint('model', 'c')
     args.ch = config.getint('model', 'ch')
     args.down_size = config.getint('model', 'down_size')
@@ -82,10 +84,12 @@ config_file = exp_path + "config.conf"
 config = configparser.ConfigParser()
 config.read(config_file)
 args = get_config(config)
-args.img_size = (64,64)
+args.img_size = (args.v[0]*args.down_size, args.v[1]*args.down_size)
 
 # Print 
 print("Configure File: %s"%(config_file))
+print("Number of world cells: %d"%(args.w))
+print("Size of view cells: " + str(args.v))
 print("Number of concepts: %d"%(args.c))
 print("Number of channels: %d"%(args.ch))
 print("Downsampling size of view cell: %d"%(args.down_size))
@@ -110,9 +114,11 @@ if not os.path.exists(result_path):
 
 ############ Networks ############
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-net = GQN(csize=args.c, ch=args.ch, vsize=7, draw_layers=args.draw_layers, down_size=args.down_size, share_core=args.share_core).to(device)
+net = SRGQN(n_wrd_cells=args.w, view_size=args.v, csize=args.c, ch=args.ch, vsize=7, \
+    draw_layers=args.draw_layers, down_size=args.down_size, share_core=args.share_core).to(device)
 net.load_state_dict(torch.load(save_path+"srgqn.pth"))
 net.eval()
 
 test_loader = DataLoader(test_dataset, batch_size=1, shuffle=True)
-eval(net, test_dataset, result_path, img_size=args.img_size)
+for i in range(3,9):
+    eval(net, test_dataset, result_path, obs_size=i, img_size=args.img_size)

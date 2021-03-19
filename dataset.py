@@ -45,7 +45,7 @@ class GqnDatasets(Dataset):
     def __len__(self):
         return len(self.records)
 
-    def __getitem__(self, idx, use_distort="barrel"):
+    def __getitem__(self, idx, use_distort=None):
         scene_path = os.path.join(self.root_dir, self.records[idx])
         with gzip.open(scene_path, "r") as f:
             data = torch.load(f)

@@ -6,16 +6,18 @@ from padding_same_conv import Conv2d
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class Tower(nn.Module):
-    def __init__(self):
+    def __init__(self, vsize=7, csize=256):
         super(Tower, self).__init__()
+        self.vsize = vsize
+        self.csize = csize
         self.conv1 = nn.Conv2d(3, 256, kernel_size=2, stride=2)
         self.conv2 = nn.Conv2d(256, 256, kernel_size=2, stride=2)
         self.conv3 = nn.Conv2d(256, 128, kernel_size=3, stride=1, padding=1)
         self.conv4 = nn.Conv2d(128, 256, kernel_size=2, stride=2)
-        self.conv5 = nn.Conv2d(256+7, 256, kernel_size=3, stride=1, padding=1)
-        self.conv6 = nn.Conv2d(256+7, 128, kernel_size=3, stride=1, padding=1)
+        self.conv5 = nn.Conv2d(256+vsize, 256, kernel_size=3, stride=1, padding=1)
+        self.conv6 = nn.Conv2d(256+vsize, 128, kernel_size=3, stride=1, padding=1)
         self.conv7 = nn.Conv2d(128, 256, kernel_size=3, stride=1, padding=1)
-        self.conv8 = nn.Conv2d(256, 256, kernel_size=1, stride=1)
+        self.conv8 = nn.Conv2d(256, csize, kernel_size=1, stride=1)
 
     def forward(self, x, v):
         # Resisual connection
@@ -26,7 +28,7 @@ class Tower(nn.Module):
         r = F.relu(self.conv4(r)) + skip_out
 
         # Broadcast
-        v = v.view(v.size(0), 7, 1, 1).repeat(1, 1, 16, 16)
+        v = v.view(v.size(0), self.vsize, 1, 1).repeat(1, 1, r.shape[2], r.shape[3])
         
         # Resisual connection
         # Concatenate
@@ -40,8 +42,10 @@ class Tower(nn.Module):
         return r
 
 class TowerBN(nn.Module):
-    def __init__(self):
+    def __init__(self, vsize=7, csize=256):
         super(TowerBN, self).__init__()
+        self.vsize = vsize
+        self.csize = csize
         self.conv1 = nn.Conv2d(3, 256, kernel_size=2, stride=2)
         self.conv2 = nn.Conv2d(256, 256, kernel_size=2, stride=2)
         self.bn2 = nn.BatchNorm2d(256)
@@ -49,13 +53,13 @@ class TowerBN(nn.Module):
         self.bn3 = nn.BatchNorm2d(128)
         self.conv4 = nn.Conv2d(128, 256, kernel_size=2, stride=2)
         self.bn4 = nn.BatchNorm2d(256)
-        self.conv5 = nn.Conv2d(256+7, 256, kernel_size=3, stride=1, padding=1)
+        self.conv5 = nn.Conv2d(256+vsize, 256, kernel_size=3, stride=1, padding=1)
         self.bn5 = nn.BatchNorm2d(256)
-        self.conv6 = nn.Conv2d(256+7, 128, kernel_size=3, stride=1, padding=1)
+        self.conv6 = nn.Conv2d(256+vsize, 128, kernel_size=3, stride=1, padding=1)
         self.bn6 = nn.BatchNorm2d(128)
         self.conv7 = nn.Conv2d(128, 256, kernel_size=3, stride=1, padding=1)
         self.bn7 = nn.BatchNorm2d(256)
-        self.conv8 = nn.Conv2d(256, 256, kernel_size=1, stride=1)
+        self.conv8 = nn.Conv2d(256, csize, kernel_size=1, stride=1)
 
     def forward(self, x, v):
         # Resisual connection
@@ -66,7 +70,7 @@ class TowerBN(nn.Module):
         r = self.bn4(F.relu(self.conv4(r))) + skip_out
 
         # Broadcast
-        v = v.view(v.size(0), 7, 1, 1).repeat(1, 1, 16, 16)
+        v = v.view(v.size(0), vsize, 1, 1).repeat(1, 1, 16, 16)
         
         # Resisual connection
         # Concatenate
