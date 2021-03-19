@@ -208,6 +208,8 @@ while(True):
         # ------------ Train ------------
         loss_query.backward()
         opt.step()
+        if args.plus:
+            net.strn.sample_wcode(dist = "uniform")
         steps += 1
         
         # ------------ Print Result ------------
