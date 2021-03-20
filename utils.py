@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 
-def draw_query(net, dataset, obs_size=3, vsize=7, row_size=32, gen_size=10, img_size=(64,64), border=[1,4,2], shuffle=False):
+def draw_query(net, dataset, obs_size=3, vsize=7, row_size=32, gen_size=10, img_size=(64,64), border=[1,4,3], shuffle=False):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     data_loader = DataLoader(dataset, batch_size=1, shuffle=shuffle)
     draw_counter = 0
@@ -23,7 +23,7 @@ def draw_query(net, dataset, obs_size=3, vsize=7, row_size=32, gen_size=10, img_
             x_query_sample = net.sample(x_obs, v_obs, v_query, n_obs=obs_size)
             x_query_sample = x_query_sample.detach().permute(0,2,3,1).cpu().numpy()
         
-        for j in range(32):
+        for j in range(image.shape[0]):
             x_np = []
             bscale = int(img_size[1]/64)
             for i in range(obs_size):
@@ -43,7 +43,8 @@ def draw_query(net, dataset, obs_size=3, vsize=7, row_size=32, gen_size=10, img_
                 img_row = cv2.cvtColor(img_row.astype(np.uint8), cv2.COLOR_BGR2RGB)
                 img_list.append(img_row)
                 draw_counter += 1
-                print("\rProgress: "+str(draw_counter).zfill(3)+"/"+str(gen_size).zfill(3), end="")
+                fill_size = len(str(gen_size))
+                print("\rProgress: "+str(draw_counter).zfill(fill_size)+"/"+str(gen_size), end="")
                 img_row = []
             elif row_counter % row_size < row_size:
                 img_row.append(np.ones([border[2]*bscale,x_np.shape[1],3]))

@@ -32,7 +32,7 @@ class GqnDatasets(Dataset):
     :param fraction: fraction of dataset to use
     :param target_transform: transform on viewpoints
     """
-    def __init__(self, root_dir, train=True, transform=None, fraction=1.0, target_transform=transform_viewpoint, distort_type=None):
+    def __init__(self, root_dir, train=True, transform=None, fraction=1.0, view_trans=True, distort_type=None):
         super(GqnDatasets, self).__init__()
         assert fraction > 0.0 and fraction <= 1.0
         prefix = "train" if train else "test"
@@ -40,8 +40,8 @@ class GqnDatasets(Dataset):
         self.records = sorted([p for p in os.listdir(self.root_dir) if "pt" in p])
         self.records = self.records[:int(len(self.records)*fraction)]
         self.transform = transform
-        self.target_transform = target_transform
         self.distort_type = distort_type
+        self.view_trans = view_trans
 
     def __len__(self):
         return len(self.records)
@@ -64,10 +64,12 @@ class GqnDatasets(Dataset):
             images = self.transform(images)
         
         if self.distort_type is not None:
-            if distort_type == "barrel":
-                grid = distort.distort_barrel(images.shape[3], images.shape[4])
-            elif distort_type == "sin":
-                grid = distort.distort_sin(images.shape[3], images.shape[4])
+            if distort_type == "barrel_low":
+                grid = distort_barrel_low(images.shape[3], images.shape[4])
+            elif distort_type == "barrel_high":
+                grid = distort_barrel_high(images.shape[3], images.shape[4])
+            elif distort_type == "stretch":
+                grid = distort.stretch(images.shape[3], images.shape[4])
             shape_rec = images.shape
             images = images.reshape(shape_rec[0]*shape_rec[1], shape_rec[2], shape_rec[3], shape_rec[4])
             grid = torch.FloatTensor(grid).repeat(images.shape[0],1,1,1)
@@ -75,8 +77,8 @@ class GqnDatasets(Dataset):
             images = images.reshape(shape_rec)
 
         viewpoints = torch.FloatTensor(viewpoints)
-        if self.target_transform:
-            viewpoints = self.target_transform(viewpoints)
+        if self.view_trans:
+            viewpoints = transform_viewpoint(viewpoints)
 
         return images, viewpoints
 

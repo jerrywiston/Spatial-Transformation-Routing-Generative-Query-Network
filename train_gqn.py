@@ -111,8 +111,10 @@ else:
 
 ############ Dataset ############
 path = args.data_path
-train_dataset = GqnDatasets(root_dir=path, train=True, fraction=args.frac_train)
-test_dataset = GqnDatasets(root_dir=path, train=False, fraction=args.frac_test)
+train_dataset = GqnDatasets(root_dir=path, train=True, fraction=args.frac_train, 
+                            view_trans=args.view_trans, distort_type=args.distort_type)
+test_dataset = GqnDatasets(root_dir=path, train=False, fraction=args.frac_test, 
+                            view_trans=args.view_trans, distort_type=args.distort_type)
 print("Data path: %s"%(args.data_path))
 print("Data fraction: %f / %f"%(args.frac_train, args.frac_test))
 print("Train data: ", len(train_dataset))

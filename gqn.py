@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from encoder_gqn import Tower
+from encoder import GQNTower
 import generator
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -12,7 +12,7 @@ class GQN(nn.Module):
         self.vsize = vsize
         self.csize = csize
         self.down_size = down_size
-        self.encoder = Tower(vsize, csize).to(device)
+        self.encoder = GQNTower(vsize, csize).to(device)
         self.generator = generator.GeneratorNetwork(x_dim=3, r_dim=csize+vsize, L=draw_layers, scale=down_size, share=share_core).to(device)
 
     def step_scene_fusion(self, x, v, n_obs):

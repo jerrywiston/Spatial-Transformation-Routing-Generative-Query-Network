@@ -23,10 +23,6 @@ def get_config_strgqn(config):
     else:
         args.stochastic_unit = True
     
-    if config.has_option('model', 'view_trans'):
-        args.view_trans = config.getboolean('model', 'view_trans')
-    else:
-        args.view_trans = True
     # Experimental Parameters
     args.data_path = config.get('exp', 'data_path')
     args.frac_train = config.getfloat('exp', 'frac_train')
@@ -35,21 +31,30 @@ def get_config_strgqn(config):
     args.total_steps = config.getint('exp', 'total_steps')
     args.total_epochs = config.getint('exp', 'total_epochs')
     args.kl_scale = config.getfloat('exp', 'kl_scale')
+    
     if config.has_option('exp', 'convert_bgr'):
         args.convert_rgb = config.getboolean('exp', 'convert_bgr')
     else:
         args.convert_rgb = True
+    
     if config.has_option('exp', 'distort_type'):
         args.distort_type = config.get('exp', 'distort_type')
         if args.distort_type == "None":
             args.distort_type = None
     else:
         args.distort_type = None
+    
+    if config.has_option('exp', 'view_trans'):
+        args.view_trans = config.getboolean('exp', 'view_trans')
+    else:
+        args.view_trans = True
+
     return args
 
 def get_config_gqn(config):
     # Fill the parameters
     args = lambda: None
+
     # Model Parameters
     args.img_size = (config.getint('model', 'img_h'), config.getint('model', 'img_w'))
     args.c = config.getint('model', 'c')
@@ -71,6 +76,7 @@ def get_config_gqn(config):
         args.view_trans = config.getboolean('model', 'view_trans')
     else:
         args.view_trans = True
+
     # Experimental Parameters
     args.data_path = config.get('exp', 'data_path')
     args.frac_train = config.getfloat('exp', 'frac_train')
@@ -79,14 +85,22 @@ def get_config_gqn(config):
     args.total_steps = config.getint('exp', 'total_steps')
     args.total_epochs = config.getint('exp', 'total_epochs')
     args.kl_scale = config.getfloat('exp', 'kl_scale')
+    
     if config.has_option('exp', 'convert_bgr'):
         args.convert_rgb = config.get('exp', 'convert_bgr')
     else:
         args.convert_rgb = True
+    
     if config.has_option('exp', 'distort_type'):
         args.distort_type = config.get('exp', 'distort_type')
     else:
         args.distort_type = None
+    
+    if config.has_option('exp', 'view_trans'):
+        args.view_trans = config.getboolean('exp', 'view_trans')
+    else:
+        args.view_trans = True
+
     return args
 
 def load_eval_config(exp_path):
