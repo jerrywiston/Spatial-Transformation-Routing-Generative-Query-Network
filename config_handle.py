@@ -23,6 +23,11 @@ def get_config_strgqn(config):
     else:
         args.stochastic_unit = True
     
+    if config.has_option('model', 'loss_type'):
+        args.loss_type = config.get('model', 'loss_type')
+    else:
+        args.loss_type = "MSE"
+    
     # Experimental Parameters
     args.data_path = config.get('exp', 'data_path')
     args.frac_train = config.getfloat('exp', 'frac_train')
@@ -76,6 +81,11 @@ def get_config_gqn(config):
         args.view_trans = config.getboolean('model', 'view_trans')
     else:
         args.view_trans = True
+    
+    if config.has_option('model', 'loss_type'):
+        args.loss_type = config.get('model', 'loss_type')
+    else:
+        args.loss_type = "MSE"
 
     # Experimental Parameters
     args.data_path = config.get('exp', 'data_path')

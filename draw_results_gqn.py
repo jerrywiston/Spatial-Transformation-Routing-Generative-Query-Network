@@ -57,6 +57,7 @@ net.eval()
 obs_size = 3
 row_size = 1
 gen_size = 400
+
 img_list = utils.draw_query(net, test_dataset, obs_size=obs_size, vsize=args.vsize, row_size=row_size, gen_size=gen_size, img_size=args.img_size)
 print("Output image files ...")
 for i in range(len(img_list)):

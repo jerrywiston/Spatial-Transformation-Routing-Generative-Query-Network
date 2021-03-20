@@ -157,6 +157,16 @@ params = list(net.parameters())
 opt = optim.Adam(params, lr=5e-5, betas=(0.5, 0.999))
 
 ############ Training ############
+if args.loss_type == "MSE":
+    criterion = nn.MSELoss()
+elif args.loss_type == "MAE":
+    criterion = nn.L1Loss()
+elif args.loss_type == "CE":
+    creterion = nn.BCELoss()
+else:
+    criterion = nn.MSELoss()
+
+############ Training ############
 max_obs_size = args.max_obs_size
 total_steps = args.total_steps
 total_epochs = args.total_epochs
@@ -205,13 +215,13 @@ while(True):
         net.zero_grad()
         if args.stochastic_unit:
             x_query, kl_query = net(x_obs, v_obs, x_query_gt, v_query, n_obs=obs_size)
-            lh_query = nn.MSELoss()(x_query, x_query_gt).mean()
+            lh_query = criterion(x_query, x_query_gt).mean()
             kl_query = torch.mean(torch.sum(kl_query, dim=[1,2,3]))
             loss_query = lh_query + args.kl_scale*kl_query
         else:
             x_query = net.sample(x_obs, v_obs, v_query, n_obs=obs_size)
             kl_query = 0
-            lh_query = nn.MSELoss()(x_query, x_query_gt).mean()
+            lh_query = criterion(x_query, x_query_gt).mean()
 
         # ------------ Train ------------
         loss_query.backward()
