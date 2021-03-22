@@ -3,8 +3,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 import encoder
 import strn
+import strn_plus
 import generator
-import generator_vae
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 

@@ -90,7 +90,7 @@ max_obs_size = args.max_obs_size
 total_steps = args.total_steps
 total_epochs = args.total_epochs
 train_record = {"loss_query":[], "lh_query":[], "kl_query":[]}
-eval_record = {"mse_train":[], "kl_train":[], "mse_test":[], "kl_test":[]}
+eval_record = []
 best_mse = 999999
 print("Start training ...")
 print("==============================")

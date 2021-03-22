@@ -12,8 +12,8 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 
 from strgqn import SRGQN
-import shapenet_dataset
-from shapenet_dataset import get_pose_code as pcode
+import dataset_shapenet
+from dataset_shapenet import get_pose_code as pcode
 import numpy as np
 
 magic_list_arith = [

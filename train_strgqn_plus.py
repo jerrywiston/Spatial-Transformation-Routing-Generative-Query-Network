@@ -14,7 +14,7 @@ from dataset import GqnDatasets
 import configparser
 import config_handle
 import utils
-from strgqn import STRGQN
+from strgqn_plus import STRGQN
 
 ############ Parameter Parsing ############
 parser = argparse.ArgumentParser()
@@ -140,6 +140,7 @@ while(True):
         # ------------ Train ------------
         loss_query.backward()
         opt.step()
+        net.strn.sample_wcode(dist = "uniform")
         steps += 1
         
         # ------------ Print Result ------------

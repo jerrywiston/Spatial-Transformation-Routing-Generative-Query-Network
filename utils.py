@@ -3,7 +3,7 @@ import cv2
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
-import shapenet_dataset
+import dataset_shapenet
 
 ############ Draw Results ############
 def draw_query(net, dataset, obs_size=3, row_size=32, gen_size=10, shuffle=False, border=[1,4,3]):
@@ -61,7 +61,7 @@ def draw_query_shapenet(net, dataset, obs_size=3, vsize=7, row_size=32, gen_size
     img_list = []
     for it in range(gen_size):
         img_row = []
-        x_obs, v_obs, x_query_gt, v_query = shapenet_dataset.get_batch(dataset, obs_size, row_size)
+        x_obs, v_obs, x_query_gt, v_query = dataset_shapenet.get_batch(dataset, obs_size, row_size)
         with torch.no_grad():
             x_query_sample = net.sample(x_obs, v_obs, v_query, n_obs=obs_size)
             x_query_sample = x_query_sample.detach().permute(0,2,3,1).cpu().numpy()

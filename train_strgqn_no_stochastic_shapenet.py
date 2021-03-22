@@ -12,11 +12,11 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
  
 from strgqn import SRGQN
-import shapenet_dataset
+import dataset_shapenet
 
 ############ Util Functions ############
 def draw_result(net, dataset, obs_size=3, gen_size=5, img_size=(128,128), convert_bgr=True):
-    x_obs, v_obs, x_query_gt, v_query = shapenet_dataset.get_batch(dataset, obs_size, gen_size)
+    x_obs, v_obs, x_query_gt, v_query = dataset_shapenet.get_batch(dataset, obs_size, gen_size)
     x_query = net.sample(x_obs, v_obs, v_query, n_obs=obs_size)
     # Draw Observation
     canvas = np.zeros((img_size[0]*gen_size,img_size[1]*(obs_size+2),3), dtype=np.uint8)
