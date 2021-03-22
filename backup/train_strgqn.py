@@ -4,6 +4,9 @@ import os
 import json
 import datetime
 import argparse
+import configparser
+import config_handle
+import utils
 
 import torch
 import torch.nn as nn
@@ -11,9 +14,78 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 
 from dataset import GqnDatasets
-import configparser
-import config_handle
-import utils
+
+############ Util Functions ############
+def draw_result(net, dataset, obs_size=3, gen_size=5, vsize=7, img_size=(64,64), convert_bgr=True):
+    data_loader = DataLoader(dataset, batch_size=1, shuffle=True)
+    for it, batch in enumerate(data_loader):
+        image = batch[0].squeeze(0)
+        pose = batch[1].squeeze(0)
+        # Get Data
+        x_obs = image[:,:obs_size].reshape(-1,3,img_size[0],img_size[1]).to(device)
+        v_obs = pose[:,:obs_size].reshape(-1, vsize).to(device)
+        v_query = pose[:,obs_size].to(device)
+        x_query = net.sample(x_obs, v_obs, v_query, n_obs=obs_size)
+        # Draw Observation
+        canvas = np.zeros((img_size[0]*gen_size,img_size[1]*(obs_size+2),3), dtype=np.uint8)
+        x_obs_draw = (image[:gen_size,:obs_size].detach()*255).permute(0,3,1,4,2).cpu().numpy().astype(np.uint8)
+        x_obs_draw = cv2.cvtColor(x_obs_draw.reshape(img_size[0]*gen_size,img_size[1]*obs_size,3), cv2.COLOR_BGR2RGB)
+        canvas[:img_size[0]*gen_size,:img_size[1]*obs_size,:] = x_obs_draw
+        # Draw Query GT
+        x_gt_draw = (image[:gen_size,obs_size].detach()*255).permute(0,2,3,1).cpu().numpy().astype(np.uint8)
+        x_gt_draw = x_gt_draw.reshape(img_size[0]*gen_size,img_size[1],3)
+        if convert_bgr:
+            x_gt_draw = cv2.cvtColor(x_gt_draw, cv2.COLOR_BGR2RGB)
+        canvas[:,img_size[1]*(obs_size):img_size[1]*(obs_size+1),:] = x_gt_draw
+        # Draw Query Gen
+        x_query_draw = (x_query[:gen_size].detach()*255).permute(0,2,3,1).cpu().numpy().astype(np.uint8)
+        x_query_draw = x_query_draw.reshape(img_size[0]*gen_size,img_size[1],3)
+        if convert_bgr:
+            x_query_draw = cv2.cvtColor(x_query_draw, cv2.COLOR_BGR2RGB)
+        canvas[:,img_size[1]*(obs_size+1):,:] = x_query_draw
+        # Draw Grid
+        cv2.line(canvas, (0,0),(0,img_size[1]*gen_size),(0,0,0), 2)
+        cv2.line(canvas, (img_size[0]*(obs_size+2)-1,0),(img_size[1]*(obs_size+2)-1,img_size[1]*gen_size),(0,0,0), 2)
+        cv2.line(canvas, (img_size[0]*obs_size,0),(img_size[1]*obs_size,img_size[1]*gen_size),(255,0,0), 2)
+        cv2.line(canvas, (img_size[0]*(obs_size+1),0),(img_size[1]*(obs_size+1),img_size[1]*gen_size),(0,0,255), 2)
+        for i in range(1,3):
+            canvas[:,img_size[1]*i:img_size[1]*i+1,:] = 0
+        for i in range(gen_size):
+            canvas[img_size[0]*i:img_size[0]*i+1,:,:] = 0
+            canvas[img_size[0]*(i+1)-1:img_size[0]*(i+1),:,:] = 0
+        break
+    return canvas
+
+def eval(net, dataset, obs_size=3, vsize=7, max_batch=400, img_size=(64,64)):
+    data_loader = DataLoader(dataset, batch_size=1, shuffle=False)
+    lh_record = []
+    kl_record = []
+    for it, batch in enumerate(data_loader):
+        if it+1 > max_batch:
+            break
+        image = batch[0].squeeze(0)
+        pose = batch[1].squeeze(0)
+        # Get Data
+        x_obs = image[:,:obs_size].reshape(-1,3,img_size[0],img_size[1]).to(device)
+        v_obs = pose[:,:obs_size].reshape(-1,vsize).to(device)
+        v_query = pose[:,obs_size].to(device)
+        x_query_gt = image[:,obs_size].to(device)
+        with torch.no_grad():
+            x_query_sample = net.sample(x_obs, v_obs, v_query, n_obs=obs_size)
+            x_query, kl_query = net(x_obs, v_obs, x_query_gt, v_query, n_obs=obs_size)
+            kl_query = torch.mean(torch.sum(kl_query, dim=[1,2,3])).cpu().numpy()
+            mse_batch = nn.MSELoss()(x_query_sample, x_query_gt).cpu().numpy()
+            lh_query = mse_batch.mean()
+            lh_query_var = mse_batch.var()
+            lh_record.append(lh_query)
+            kl_record.append(kl_query)
+        len_size = min(len(dataset), max_batch)
+        print("\r[Eval %s/%s] MSE: %f| KL: %f"%(str(it+1).zfill(4), str(len_size).zfill(4), lh_query, kl_query), end="")
+    lh_mean = np.array(lh_record).mean()
+    lh_mean_var = np.array(lh_query_var).mean()
+    kl_mean = np.array(kl_record).mean()
+    print("\nMSE =", lh_mean, ", KL =", kl_mean)
+    return float(lh_mean), float(kl_mean), lh_record, kl_record
 
 ############ Parameter Parsing ############
 parser = argparse.ArgumentParser()
@@ -85,7 +157,7 @@ net = STRGQN(n_wrd_cells=args.w, view_size=args.v, csize=args.c, ch=args.ch, vsi
 params = list(net.parameters())
 opt = optim.Adam(params, lr=5e-5, betas=(0.5, 0.999))
 
-############ Loss Function ############
+############ Training ############
 if args.loss_type == "MSE":
     criterion = nn.MSELoss()
 elif args.loss_type == "MAE":
@@ -100,8 +172,8 @@ max_obs_size = args.max_obs_size
 total_steps = args.total_steps
 total_epochs = args.total_epochs
 train_record = {"loss_query":[], "lh_query":[], "kl_query":[]}
-eval_record = []
-best_eval = 999999
+eval_record = {"mse_train":[], "kl_train":[], "mse_test":[], "kl_test":[]}
+best_mse = 999999
 print("Start training ...")
 print("==============================")
 steps = 0
@@ -130,6 +202,15 @@ while(True):
         v_obs = pose[:,obs_idx].reshape(-1,7).to(device)
         x_query_gt = image[:,query_idx].to(device)
         v_query = pose[:,query_idx].to(device)
+
+        # ------------ Get data (Fixed Observation) ------------
+        '''
+        obs_size = 3
+        x_obs = image[:,:obs_size].reshape(-1,3,64,64).to(device)
+        v_obs = pose[:,:obs_size].reshape(-1,7).to(device)
+        x_query_gt = image[:,obs_size+1].to(device)
+        v_query = pose[:,obs_size+1].to(device)
+        '''
 
         # ------------ Forward ------------
         net.zero_grad()
@@ -167,17 +248,17 @@ while(True):
         # ------------ Output Image ------------
         if steps % eval_step == 0:
             print("------------------------------")
+            print("Generate image ...")
             obs_size = 3
             gen_size = 5
             # Train
-            print("Generate training image ...")
             fname = img_path+str(int(steps/eval_step)).zfill(4)+"_train.png"
-            canvas = utils.draw_query(net, train_dataset, obs_size=3, row_size=5, gen_size=1, shuffle=True)[0]
+            canvas = draw_result(net, train_dataset, obs_size, gen_size, args.vsize, args.img_size)
+            #utils.draw_query(net, test_dataset, obs_size, args.vsize, row_size, gen_size, args.img_size, True)
             cv2.imwrite(fname, canvas)
             # Test
-            print("Generate testing image ...")
             fname = img_path+str(int(steps/eval_step)).zfill(4)+"_test.png"
-            canvas = utils.draw_query(net, test_dataset, obs_size=3, row_size=5, gen_size=1, shuffle=True)[0]
+            canvas = draw_result(net, test_dataset, obs_size, gen_size, args.vsize, args.img_size)
             cv2.imwrite(fname, canvas)
 
             # ------------ Training Record ------------
@@ -190,30 +271,32 @@ while(True):
 
             # ------------ Evaluation Record ------------
             print("Evaluate Training Data ...")
-            eval_results_train = utils.eval(net, train_dataset, obs_size=3, max_batch=400, shuffle=False)
+            lh_train, kl_train, _, _ = eval(net, train_dataset, obs_size=3, vsize=args.vsize, img_size=args.img_size)
             print("Evaluate Testing Data ...")
-            eval_results_test = utils.eval(net, test_dataset, obs_size=3, max_batch=400, shuffle=False)
-            eval_record.append({"steps":steps, "train":eval_results_train, "test":eval_results_test})
+            lh_test, kl_test, _, _ = eval(net, test_dataset, obs_size=3, vsize=args.vsize, img_size=args.img_size)
+            eval_record["mse_train"].append(lh_train)
+            eval_record["kl_train"].append(kl_train)
+            eval_record["mse_test"].append(lh_test)
+            eval_record["kl_test"].append(kl_test)
             print("Dump evaluation record ...")
             with open(model_path+'eval_record.json', 'w') as file:
                 json.dump(eval_record, file)
 
-            # ------------ Save Model ------------
+            # ------------ Save Model (One Epoch) ------------
             if steps%100000 == 0:
                 print("Save model ...")
                 torch.save(net.state_dict(), save_path + "srgqn_" + str(steps).zfill(4) + ".pth")
-            
-            # Apply RMSE as the metric for model selection.
-            if eval_results_test["rmse"][0] < best_eval:
-                best_eval = eval_results_test["rmse"][0]
+
+            if lh_test < best_mse:
+                best_mse = lh_test
                 print("Save best model ...")
                 torch.save(net.state_dict(), save_path + "srgqn.pth")
-            print("Best Test RMSE:", best_eval)
+            print("Best Test MSE:", best_mse)
             print("------------------------------")
 
     print("==============================")
     if steps >= total_steps:
         print("Save final model ...")
-        torch.save(net.state_dict(), save_path + "srgqn_" + str(steps).zfill(4) + ".pth")
+        torch.save(net.state_dict(), save_path + "srgqn_final.pth")
         break
     

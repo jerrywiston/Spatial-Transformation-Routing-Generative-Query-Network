@@ -103,6 +103,8 @@ def get_config_gqn(config):
     
     if config.has_option('exp', 'distort_type'):
         args.distort_type = config.get('exp', 'distort_type')
+        if args.distort_type == "None":
+            args.distort_type = None
     else:
         args.distort_type = None
     

@@ -64,11 +64,11 @@ class GqnDatasets(Dataset):
             images = self.transform(images)
         
         if self.distort_type is not None:
-            if distort_type == "barrel_low":
+            if self.distort_type == "barrel_low":
                 grid = distort_barrel_low(images.shape[3], images.shape[4])
-            elif distort_type == "barrel_high":
+            elif self.distort_type == "barrel_high":
                 grid = distort_barrel_high(images.shape[3], images.shape[4])
-            elif distort_type == "stretch":
+            elif self.distort_type == "stretch":
                 grid = distort.stretch(images.shape[3], images.shape[4])
             shape_rec = images.shape
             images = images.reshape(shape_rec[0]*shape_rec[1], shape_rec[2], shape_rec[3], shape_rec[4])

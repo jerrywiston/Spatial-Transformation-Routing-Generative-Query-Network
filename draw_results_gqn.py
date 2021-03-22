@@ -58,7 +58,7 @@ obs_size = 3
 row_size = 1
 gen_size = 400
 
-img_list = utils.draw_query(net, test_dataset, obs_size=obs_size, vsize=args.vsize, row_size=row_size, gen_size=gen_size, img_size=args.img_size)
+img_list = utils.draw_query(net, test_dataset, obs_size=obs_size, row_size=row_size, gen_size=gen_size)
 print("Output image files ...")
 for i in range(len(img_list)):
     cv2.imwrite(result_path+"result_"+str(i).zfill(3)+".jpg", img_list[i]) 

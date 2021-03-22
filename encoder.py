@@ -100,6 +100,7 @@ class EncoderNetworkRes(nn.Module):
         self.bn3 = nn.BatchNorm2d(ch)
         self.conv3 = Conv2d(ch, ch, 3, stride=1)
         # Pool + Feature Dim
+        #self.pool3 = nn.MaxPool2d(kernel_size=2)
         self.pool3 = BlurPool2d(filt_size=3, channels=ch, stride=2)
         self.conv4 = Conv2d(ch, ch*2, 1, stride=1)
         # ResBlock 2
