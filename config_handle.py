@@ -34,7 +34,6 @@ def get_config_strgqn(config):
     args.frac_test = config.getfloat('exp', 'frac_test')
     args.max_obs_size = config.get('exp', 'max_obs_size')
     args.total_steps = config.getint('exp', 'total_steps')
-    args.total_epochs = config.getint('exp', 'total_epochs')
     args.kl_scale = config.getfloat('exp', 'kl_scale')
     
     if config.has_option('exp', 'convert_bgr'):
@@ -61,7 +60,6 @@ def get_config_gqn(config):
     args = lambda: None
 
     # Model Parameters
-    args.img_size = (config.getint('model', 'img_h'), config.getint('model', 'img_w'))
     args.c = config.getint('model', 'c')
     args.ch = config.getint('model', 'ch')
     args.down_size = config.getint('model', 'down_size')
@@ -93,7 +91,6 @@ def get_config_gqn(config):
     args.frac_test = config.getfloat('exp', 'frac_test')
     args.max_obs_size = config.get('exp', 'max_obs_size')
     args.total_steps = config.getint('exp', 'total_steps')
-    args.total_epochs = config.getint('exp', 'total_epochs')
     args.kl_scale = config.getfloat('exp', 'kl_scale')
     
     if config.has_option('exp', 'convert_bgr'):

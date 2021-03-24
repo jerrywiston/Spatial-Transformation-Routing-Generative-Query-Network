@@ -13,7 +13,8 @@
 import numpy as np
 import cv2
 import argparse
-import parse_config
+import config_handle
+import configparser
 import os
 
 import torch
@@ -21,7 +22,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 
-from srgqn_sample import SRGQN
+from strgqn import STRGQN
 #from srgqn_vae import SRGQN
 from dataset import GqnDatasets
 np.set_printoptions(precision=3)
@@ -96,7 +97,10 @@ parser.add_argument('--round', nargs='?', type=int, default=2, help='Number of r
 parser.add_argument('--signal', nargs='?', type=int, default=40, help='Amplitude of signal.')
 exp_path = parser.parse_args().path
 save_path = exp_path + "save/"
-args = parse_config.load_eval_config(exp_path)
+config = configparser.ConfigParser()
+config_file = exp_path + "config.conf"
+config.read(config_file)
+args = config_handle.get_config_strgqn(config)
 print(exp_path)
 
 # Print 
@@ -120,7 +124,7 @@ print("Test data: ", len(test_dataset))
 
 ############ Networks ############
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-net = SRGQN(n_wrd_cells=args.w, view_size=args.v, csize=args.c, ch=args.ch, vsize=7, \
+net = STRGQN(n_wrd_cells=args.w, view_size=args.v, csize=args.c, ch=args.ch, vsize=7, \
     draw_layers=args.draw_layers, down_size=args.down_size, share_core=args.share_core).to(device)
 net.load_state_dict(torch.load(save_path+"srgqn.pth"))
 net.eval()

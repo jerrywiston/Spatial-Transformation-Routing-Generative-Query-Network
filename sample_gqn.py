@@ -10,18 +10,21 @@ import torch
 
 from gqn import GQN
 from dataset import GqnDatasets
+import dataset_shapenet
 import config_handle
 import utils
 
 ############ Parameter Parsing ############
 parser = argparse.ArgumentParser()
 parser.add_argument('--path', nargs='?', type=str ,help='Experiment name.')
+parser.add_argument("--shapenet", help="Use ShapeNet dataset.", action="store_true")
 exp_path = parser.parse_args().path
 print(exp_path)
 config_file = exp_path + "config.conf"
 config = configparser.ConfigParser()
 config.read(config_file)
 args = config_handle.get_config_gqn(config)
+args.shapenet = parser.parse_args().shapenet
 
 # Print 
 print("Configure File: %s"%(config_file))
@@ -34,14 +37,6 @@ if args.share_core:
 else:
     print("Share core: False")
 
-############ Dataset ############
-path = args.data_path
-test_dataset = GqnDatasets(root_dir=path, train=False, fraction=args.frac_test, 
-                    view_trans=args.view_trans, distort_type=args.distort_type)
-print("Data path: %s"%(args.data_path))
-print("Data fraction: %f / %f"%(args.frac_train, args.frac_test))
-print("Test data: ", len(test_dataset))
-
 ############ Create Folder ############
 result_path = exp_path + "result/"
 save_path = exp_path + "save/"
@@ -51,14 +46,23 @@ if not os.path.exists(result_path):
 ############ Networks ############
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 net = GQN(csize=args.c, ch=args.ch, vsize=args.vsize, draw_layers=args.draw_layers, down_size=args.down_size, share_core=args.share_core).to(device)
-net.load_state_dict(torch.load(save_path+"srgqn.pth"))
+net.load_state_dict(torch.load(save_path+"strgqn.pth"))
 net.eval()
 
 obs_size = 3
-row_size = 1
-gen_size = 400
+row_size = 10
+gen_size = 100
 
-img_list = utils.draw_query(net, test_dataset, obs_size=obs_size, row_size=row_size, gen_size=gen_size)
+print("Data path: %s"%(args.data_path))
+if args.shapenet:
+    np.random.seed(5)
+    test_dataset = dataset_shapenet.read_dataset(path=args.data_path, mode="obj4")
+    img_list = utils.draw_query_shapenet(net, test_dataset, obs_size=obs_size, row_size=row_size, gen_size=gen_size)
+else:
+    test_dataset = GqnDatasets(root_dir=args.data_path, train=False, fraction=args.frac_test, 
+                    view_trans=args.view_trans, distort_type=args.distort_type)
+    img_list = utils.draw_query(net, test_dataset, obs_size=obs_size, row_size=row_size, gen_size=gen_size)
+
 print("Output image files ...")
 for i in range(len(img_list)):
     cv2.imwrite(result_path+"result_"+str(i).zfill(3)+".jpg", img_list[i]) 

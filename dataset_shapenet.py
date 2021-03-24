@@ -1,6 +1,8 @@
 import numpy as np
 import cv2
 
+np.random.seed(0)
+
 # train, test, obj4, arith, multi
 def read_dataset(path="shapenet_data.npz", mode="train"):
     data = np.load(path)[mode]
@@ -16,7 +18,7 @@ def get_pose_code(id, theta_bias=0, phi_bias=0):
     pose_code = [x, y, z, np.sin(np.deg2rad(theta)), np.cos(np.deg2rad(theta)), np.sin(np.deg2rad(phi)), np.cos(np.deg2rad(phi))]
     return np.array(pose_code).reshape(1,-1)
 
-def get_batch(data, obs_size, batch_size=32, to_torch=True):
+def get_batch(data, obs_size, batch_size=32, to_torch=True, resize=False):
     batch_id = np.random.choice(data.shape[0], batch_size)
     img_obs = []
     pose_obs = []
