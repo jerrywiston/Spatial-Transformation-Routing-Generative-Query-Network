@@ -122,13 +122,18 @@ while(True):
         
         x_obs = image[:,obs_idx].reshape(-1,3,args.img_size[0],args.img_size[1]).to(device)
         v_obs = pose[:,obs_idx].reshape(-1,7).to(device)
+        v_obs_trans = v_obs[:,3:]
+        v_obs_rot = v_obs[:,:3]
+
         x_query_gt = image[:,query_idx].to(device)
         v_query = pose[:,query_idx].to(device)
+        v_query_trans = v_query[:,3:]
+        v_query_rot = v_query[:,:3]
 
         # ------------ Forward ------------
         net.zero_grad()
         if args.stochastic_unit:
-            x_query, kl_query = net(x_obs, v_obs, x_query_gt, v_query, n_obs=obs_size)
+            x_query, kl_query = net(x_obs, v_obs_rot, x_query_gt, v_query_rot, n_obs=obs_size)
             lh_query = criterion(x_query, x_query_gt).mean()
             kl_query = torch.mean(torch.sum(kl_query, dim=[1,2,3]))
             loss_query = lh_query + args.kl_scale*kl_query
