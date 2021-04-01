@@ -12,7 +12,7 @@ class STRN(nn.Module):
         self.n_wrd_cells = n_wrd_cells
         self.view_size = view_size
         self.vsize = vsize
-        self.wcode_size = wcode_size
+        self.wcode_size = wcode_size # Must be 3 for "trans" version.
         self.emb_size = emb_size
         self.csize = csize
 
