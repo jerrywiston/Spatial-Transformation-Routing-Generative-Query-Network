@@ -50,7 +50,7 @@ if not os.path.exists(result_path):
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 net = STRGQN(n_wrd_cells=args.w, view_size=args.v, csize=args.c, ch=args.ch, vsize=args.vsize, \
     draw_layers=args.draw_layers, down_size=args.down_size, share_core=args.share_core).to(device)
-net.load_state_dict(torch.load(save_path+"srgqn.pth"))
+net.load_state_dict(torch.load(save_path+"model.pth"))
 net.eval()
 
 eval_results = utils.eval(net, test_dataset, obs_size=3, max_batch=1000, shuffle=False)

@@ -22,7 +22,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 
-from strgqn import STRGQN
+from strgqn_trans import STRGQN
 #from srgqn_vae import SRGQN
 from dataset import GqnDatasets
 np.set_printoptions(precision=3)
@@ -126,7 +126,7 @@ print("Test data: ", len(test_dataset))
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 net = STRGQN(n_wrd_cells=args.w, view_size=args.v, csize=args.c, ch=args.ch, vsize=7, \
     draw_layers=args.draw_layers, down_size=args.down_size, share_core=args.share_core).to(device)
-net.load_state_dict(torch.load(save_path+"srgqn.pth"))
+net.load_state_dict(torch.load(save_path+"model.pth"))
 net.eval()
 
 ############ Parameters ############
