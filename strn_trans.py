@@ -41,9 +41,9 @@ class STRN(nn.Module):
         elif dist == "uniform":
             self.wdist = (torch.rand(samp_size, self.wcode_size)*2-1).to(device)
         elif dist == "grid":
-            x = torch.linspace(-1, 1, samp_size[0])
-            y = torch.linspace(-1, 1, samp_size[1])
-            z = torch.linspace(-1, 1, samp_size[2])
+            x = 1.5*torch.linspace(-1, 1, samp_size[0])
+            y = 1.5*torch.linspace(-1, 1, samp_size[1])
+            z = 0.5*torch.linspace(-1, 1, samp_size[2])
             x_grid, y_grid, z_grid = torch.meshgrid(x, y, z)
             self.wdist = torch.cat((torch.unsqueeze(x_grid,0), torch.unsqueeze(y_grid,0), torch.unsqueeze(z_grid,0)), dim=0)
             self.wdist = self.wdist.reshape(3,-1).permute(1,0).to(device)
