@@ -41,9 +41,9 @@ class STRN(nn.Module):
         elif dist == "uniform":
             self.wdist = (torch.rand(samp_size, self.wcode_size)*2-1).to(device)
         elif dist == "grid":
-            x = 1.5*torch.linspace(-1, 1, samp_size[0])
-            y = 1.5*torch.linspace(-1, 1, samp_size[1])
-            z = 0.5*torch.linspace(-1, 1, samp_size[2])
+            x = torch.linspace(-1, 1, samp_size[0])
+            y = torch.linspace(-1, 1, samp_size[1])
+            z = torch.linspace(-1, 1, samp_size[2])
             x_grid, y_grid, z_grid = torch.meshgrid(x, y, z)
             self.wdist = torch.cat((torch.unsqueeze(x_grid,0), torch.unsqueeze(y_grid,0), torch.unsqueeze(z_grid,0)), dim=0)
             self.wdist = self.wdist.reshape(3,-1).permute(1,0).to(device)
@@ -56,8 +56,8 @@ class STRN(nn.Module):
         if wdist is None:
             wdist = self.wdist
         # Get Transform Location Code of World Cells
-        wcode_tile = wdist.reshape(-1, self.n_wrd_cells, self.wcode_size).repeat(v.shape[0], 1, 1)
-        v_tile = v.reshape(-1, 1, self.vsize).repeat(1, self.n_wrd_cells, 1)
+        wcode_tile = torch.unsqueeze(self.wdist, 0).repeat(v.shape[0], 1, 1)
+        v_tile = torch.unsqueeze(v, 1).repeat(1, self.n_wrd_cells, 1)
         wcode = torch.cat((wcode_tile - v_tile[:,:,:3], v_tile[:,:,3:]), dim=2).reshape(self.n_wrd_cells*v.shape[0],-1)
         h = F.relu(self.fc1(wcode))
         h = F.relu(self.fc2(h))
