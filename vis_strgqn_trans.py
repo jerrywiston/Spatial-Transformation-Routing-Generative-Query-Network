@@ -109,7 +109,7 @@ for it, batch in enumerate(data_loader):
         plt.scatter(wcode_np[:,0], wcode_np[:,1], c=activation_np, cmap=None, marker='o')
         plt.plot(v_query[i,0], v_query[i,1], "rs")
         plt.savefig(result_path + "/act_rotate_" + str(int(360/divide_num*i)).zfill(3) + ".jpg", bbox_inches = 'tight')
-        plt.clf()
+        plt.close()
         print(i)
 
     # Translation Demo
@@ -155,7 +155,7 @@ for it, batch in enumerate(data_loader):
             #
             plt.savefig(result_path + "/act_trans_" + str(i) + "_" + str(j) + ".jpg", bbox_inches = 'tight')
             print(i,j)
-            plt.clf()
+            plt.close()
     break
 
 

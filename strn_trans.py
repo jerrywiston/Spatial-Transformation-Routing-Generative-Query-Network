@@ -39,7 +39,7 @@ class STRN(nn.Module):
         if dist == "gaussian":
             self.wdist = torch.randn(samp_size, self.wcode_size).to(device)
         elif dist == "uniform":
-            self.wdist = (torch.rand(samp_size, self.wcode_size)*2-1).to(device)
+            self.wdist = 1.5*(torch.rand(samp_size, self.wcode_size)*2-1).to(device)
         elif dist == "grid":
             x = torch.linspace(-1, 1, samp_size[0])
             y = torch.linspace(-1, 1, samp_size[1])
