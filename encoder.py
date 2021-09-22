@@ -196,7 +196,7 @@ class GQNTowerBN(nn.Module):
         r = self.bn4(F.relu(self.conv4(r))) + skip_out
 
         # Broadcast
-        v = v.view(v.size(0), vsize, 1, 1).repeat(1, 1, 16, 16)
+        v = v.view(v.size(0), self.vsize, 1, 1).repeat(1, 1, 16, 16)
         
         # Resisual connection
         # Concatenate
