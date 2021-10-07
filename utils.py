@@ -3,7 +3,12 @@ import cv2
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
+import torch.optim as optim
+import dataset
 import dataset_shapenet
+import datetime
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 ############ Draw Results ############
 def draw_query(net, dataset, obs_size=3, row_size=32, gen_size=10, shuffle=False, border=[1,4,1]):
@@ -191,9 +196,9 @@ def train(net, args, model_path):
     opt = optim.Adam(params, lr=5e-5, betas=(0.5, 0.999))
 
     # ------------ Read Datasets ------------
-    train_dataset = GqnDatasets(root_dir=args.data_path, train=True, fraction=args.frac_train, 
+    train_dataset = dataset.GqnDatasets(root_dir=args.data_path, train=True, fraction=args.frac_train, 
                                 view_trans=args.view_trans, distort_type=args.distort_type)
-    test_dataset = GqnDatasets(root_dir=args.data_path, train=False, fraction=args.frac_test, 
+    test_dataset = dataset.GqnDatasets(root_dir=args.data_path, train=False, fraction=args.frac_test, 
                                 view_trans=args.view_trans, distort_type=args.distort_type)
     print("Data path: %s"%(args.data_path))
     print("Data fraction: %f / %f"%(args.frac_train, args.frac_test))
