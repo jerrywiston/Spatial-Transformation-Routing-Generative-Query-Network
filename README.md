@@ -54,5 +54,5 @@ if utilize ShapeNet dataset, add "--shapenet".
 Some examples:
 ```
 $ python train_strgqn.py --exp_name rrc_test --config config/rrc.conf
-$ python evalstrgqn.py --path experiments/2020-11-9_rrc_test
+$ python evalstrgqn.py --path experiments/2020-11-9_rrc_test/
 ```
