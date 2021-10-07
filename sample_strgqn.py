@@ -8,7 +8,7 @@ import configparser
 import numpy as np
 import torch
 
-from strgqn import STRGQN
+from core.strgqn import STRGQN
 from dataset import GqnDatasets
 import dataset_shapenet
 import config_handle

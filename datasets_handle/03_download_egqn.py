@@ -5,7 +5,7 @@ parser = argparse.ArgumentParser(description='Download EGQN datasets.')
 parser.add_argument('--dataset', nargs='?', type=str, default="disco", help='Dataset name.')
 parser.add_argument('--download_path', nargs='?', type=str, default="EGQN-Datasets" ,help='Download path.')
 parser.add_argument('--train_test_split', nargs='?', type=int, default=1944 ,help='Split of training and testing.')
-args = parser.parse_args()scos
+args = parser.parse_args()
 
 print("Create downloading folder.")
 if not os.path.exists(args.download_path):

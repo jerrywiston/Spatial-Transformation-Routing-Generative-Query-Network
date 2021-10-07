@@ -30,8 +30,8 @@ class STRGQN(nn.Module):
         self.down_size = down_size
         self.draw_layers = draw_layers
 
-        #self.encoder = encoder.EncoderNetworkRes(ch, csize, down_size).to(device)
-        self.encoder = encoder.EncoderNetworkTower(csize).to(device)
+        self.encoder = encoder.EncoderNetworkRes(ch, csize, down_size).to(device)
+        #self.encoder = encoder.EncoderNetworkTower(csize).to(device)
         #self.encoder = encoder.EncoderNetworkLight().to(device)
         self.strn = strn.STRN(n_wrd_cells, view_size=view_size, vsize=vsize, csize=csize).to(device)
         self.generator = generator.GeneratorNetwork(x_dim=3, r_dim=csize, L=draw_layers, scale=down_size, share=share_core).to(device)

@@ -6,7 +6,7 @@ import configparser
 import torch
 
 from dataset import GqnDatasets
-from gqn import GQN
+from core.gqn import GQN
 import config_handle
 import utils
 

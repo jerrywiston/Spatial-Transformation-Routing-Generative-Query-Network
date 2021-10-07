@@ -11,7 +11,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
  
-from gqn import GQN
+from core.gqn import GQN
 from dataset import GqnDatasets
 import dataset_shapenet
 import config_handle

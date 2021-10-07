@@ -15,7 +15,7 @@ from dataset import GqnDatasets
 import dataset_shapenet
 import config_handle
 import utils
-from strgqn import STRGQN
+from core.strgqn import STRGQN
 
 ############ Parameter Parsing ############
 parser = argparse.ArgumentParser()
