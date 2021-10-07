@@ -1,7 +1,11 @@
 # Spatial-Routing-Generative-Query-Network
-This is the official implementation of the paper "STR-GQN: Scene Representation and Rendering for Unknown Cameras Based on Spatial Transformation Routing", ICCV 2021.
+This is the official implementation of the paper [STR-GQN: Scene Representation and Rendering for Unknown Cameras Based on Spatial Transformation Routing](https://arxiv.org/abs/2108.03072), ICCV 2021.
 
-![Visual Parser](imgs/overview.png)
+## Architecture
+<img src="imgs/overview.png" width="512"/>
+
+## Experimental Results
+<img src="imgs/demo.png" width="800"/>
 
 ## Requirements
 - Python >= 3.6
